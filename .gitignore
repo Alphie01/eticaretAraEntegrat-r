@@ -1,0 +1,6 @@
+# Environment variables (sensitive data)
+.env
+.env.local
+.env.production
+
+node_modules/
