@@ -1,0 +1,63 @@
+{
+  "name": "eticaret-ara-entegrator",
+  "version": "1.0.0",
+  "description": "E-ticaret pazaryeri entegrasyon sistemi",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build:frontend": "cd frontend && npm run build",
+    "docker:build": "docker build -t eticaret-entegrator .",
+    "docker:run": "docker-compose up",
+    "db:seed": "node src/scripts/seed.js",
+    "jobs:worker": "node src/jobs/worker.js"
+  },
+  "keywords": [
+    "ecommerce",
+    "marketplace",
+    "integration",
+    "trendyol",
+    "hepsiburada",
+    "amazon",
+    "n11"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "sequelize": "^6.32.1",
+    "mssql": "^9.1.1",
+    "tedious": "^16.6.1",
+    "redis": "^4.6.7",
+    "axios": "^1.5.0",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "dotenv": "^16.3.1",
+    "bcryptjs": "^2.4.3",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "joi": "^17.9.2",
+    "winston": "^3.10.0",
+    "bull": "^4.11.3",
+    "cron": "^2.3.1",
+    "xml2js": "^0.6.2",
+    "moment": "^2.29.4",
+    "lodash": "^4.17.21",
+    "uuid": "^9.0.0",
+    "rate-limiter-flexible": "^2.4.2",
+    "compression": "^1.7.4",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "jest": "^29.6.2",
+    "supertest": "^6.3.3",
+    "eslint": "^8.47.0",
+    "prettier": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+} 
