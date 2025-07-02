@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const MNGCargoTracker = require('../../services/MNGCargoTracker');
-const auth = require('../../middleware/auth');
+const { protect: auth } = require('../../middleware/auth');
 const rateLimiter = require('../../middleware/rateLimiter');
 const logger = require('../../utils/logger');
 const { body, param, query, validationResult } = require('express-validator');

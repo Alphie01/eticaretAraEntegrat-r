@@ -4,13 +4,14 @@ const { protect, authorize } = require('../../middleware/auth');
 const adapterManager = require('../../core/AdapterManager');
 const logger = require('../../utils/logger');
 const { Op } = require('sequelize');
+const rateLimiter = require('../../middleware/rateLimiter');
 
 const router = express.Router();
 
 // @desc    Get all orders
 // @route   GET /api/v1/orders
 // @access  Private
-router.get('/', protect, async (req, res) => {
+router.get('/', protect, rateLimiter(20, 60), async (req, res) => {
   try {
     const {
       page = 1,
@@ -565,6 +566,84 @@ router.get('/status-distribution', protect, async (req, res) => {
       error: 'Server error while fetching status distribution'
     });
   }
+});
+
+/**
+ * @route GET /api/v1/orders/recent
+ * @desc Son siparişleri getir
+ * @access Private
+ */
+router.get('/recent', protect, rateLimiter(30, 60), async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+        
+        logger.info(`Recent orders request with limit: ${limit} by user: ${req.user?.id || 'anonymous'}`);
+        
+        // Mock data - gerçek implementasyon için veritabanından çekilecek
+        const recentOrders = [
+            { id: '#12345', platform: 'Trendyol', amount: '₺245', status: 'delivered', time: '2 saat önce' },
+            { id: '#12344', platform: 'Hepsiburada', amount: '₺189', status: 'shipped', time: '4 saat önce' },
+            { id: '#12343', platform: 'Amazon', amount: '₺456', status: 'processing', time: '6 saat önce' },
+            { id: '#12342', platform: 'N11', amount: '₺129', status: 'pending', time: '8 saat önce' },
+            { id: '#12341', platform: 'Shopify', amount: '₺78', status: 'delivered', time: '1 gün önce' },
+            { id: '#12340', platform: 'ÇiçekSepeti', amount: '₺345', status: 'shipped', time: '1 gün önce' },
+            { id: '#12339', platform: 'Pazarama', amount: '₺567', status: 'processing', time: '2 gün önce' },
+            { id: '#12338', platform: 'PTT AVM', amount: '₺234', status: 'delivered', time: '2 gün önce' },
+            { id: '#12337', platform: 'Trendyol', amount: '₺890', status: 'shipped', time: '3 gün önce' },
+            { id: '#12336', platform: 'Hepsiburada', amount: '₺123', status: 'pending', time: '3 gün önce' },
+        ].slice(0, parseInt(limit));
+
+        res.json({
+            success: true,
+            data: recentOrders
+        });
+    } catch (error) {
+        logger.error('Recent orders error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Son siparişler alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/orders/test/recent
+ * @desc Son siparişleri getir (Auth-free test)
+ * @access Public
+ */
+router.get('/test/recent', rateLimiter(30, 60), async (req, res) => {
+    try {
+        const { limit = 10 } = req.query;
+        
+        logger.info(`Recent orders test request with limit: ${limit} (no auth)`);
+        
+        // Mock data
+        const recentOrders = [
+            { id: '#12345', platform: 'Trendyol', amount: '₺245', status: 'delivered', time: '2 saat önce' },
+            { id: '#12344', platform: 'Hepsiburada', amount: '₺189', status: 'shipped', time: '4 saat önce' },
+            { id: '#12343', platform: 'Amazon', amount: '₺456', status: 'processing', time: '6 saat önce' },
+            { id: '#12342', platform: 'N11', amount: '₺129', status: 'pending', time: '8 saat önce' },
+            { id: '#12341', platform: 'Shopify', amount: '₺78', status: 'delivered', time: '1 gün önce' },
+            { id: '#12340', platform: 'ÇiçekSepeti', amount: '₺345', status: 'shipped', time: '1 gün önce' },
+            { id: '#12339', platform: 'Pazarama', amount: '₺567', status: 'processing', time: '2 gün önce' },
+            { id: '#12338', platform: 'PTT AVM', amount: '₺234', status: 'delivered', time: '2 gün önce' },
+            { id: '#12337', platform: 'Trendyol', amount: '₺890', status: 'shipped', time: '3 gün önce' },
+            { id: '#12336', platform: 'Hepsiburada', amount: '₺123', status: 'pending', time: '3 gün önce' },
+        ].slice(0, parseInt(limit));
+
+        res.json({
+            success: true,
+            data: recentOrders
+        });
+    } catch (error) {
+        logger.error('Recent orders test error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Son siparişler alınamadı',
+            error: error.message
+        });
+    }
 });
 
 module.exports = router; 

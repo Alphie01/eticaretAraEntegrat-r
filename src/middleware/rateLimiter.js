@@ -39,7 +39,61 @@ const initializeRateLimiter = () => {
   }
 };
 
-// Rate limiter middleware
+// Rate limiter middleware factory
+const createRateLimiter = (maxRequests, windowSeconds) => {
+  return async (req, res, next) => {
+    try {
+      // Create custom rate limiter for this specific limit
+      let customRateLimiter;
+      
+      try {
+        const redisClient = getRedisClient();
+        
+        if (redisClient && redisClient.isReady) {
+          customRateLimiter = new RateLimiterRedis({
+            storeClient: redisClient,
+            keyGenerator: (req) => `${req.ip}:${req.route?.path || req.path}`,
+            points: maxRequests,
+            duration: windowSeconds,
+            blockDuration: windowSeconds
+          });
+        } else {
+          throw new Error('Redis client not ready');
+        }
+      } catch (error) {
+        customRateLimiter = new RateLimiterMemory({
+          keyGenerator: (req) => `${req.ip}:${req.route?.path || req.path}`,
+          points: maxRequests,
+          duration: windowSeconds,
+          blockDuration: windowSeconds
+        });
+      }
+
+      await customRateLimiter.consume(req.ip);
+      next();
+    } catch (rejRes) {
+      const remainingPoints = rejRes.remainingPoints || 0;
+      const msBeforeNext = rejRes.msBeforeNext || 0;
+      
+      res.set({
+        'Retry-After': Math.round(msBeforeNext / 1000) || 1,
+        'X-RateLimit-Limit': maxRequests,
+        'X-RateLimit-Remaining': remainingPoints,
+        'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext)
+      });
+
+      logger.warn(`Rate limit exceeded for IP: ${req.ip}, route: ${req.path}`);
+      
+      res.status(429).json({
+        success: false,
+        error: 'Too many requests, please try again later',
+        retryAfter: Math.round(msBeforeNext / 1000)
+      });
+    }
+  };
+};
+
+// Default rate limiter middleware
 const rateLimiterMiddleware = async (req, res, next) => {
   try {
     // Initialize rate limiter if not already done
@@ -88,4 +142,5 @@ const rateLimiterMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = rateLimiterMiddleware; 
+module.exports = createRateLimiter;
+module.exports.default = rateLimiterMiddleware; 

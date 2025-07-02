@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const SuratCargoTracker = require('../../services/SuratCargoTracker');
-const auth = require('../../middleware/auth');
-const rateLimit = require('../../middleware/rateLimit');
+const { protect: auth } = require('../../middleware/auth');
+const rateLimiter = require('../../middleware/rateLimiter');
 const logger = require('../../utils/logger');
 
 const suratCargo = new SuratCargoTracker();
@@ -54,7 +54,7 @@ const suratCargo = new SuratCargoTracker();
  *             schema:
  *               $ref: '#/components/schemas/SuratCargoTracking'
  */
-router.get('/track/:trackingNumber', rateLimit, async (req, res) => {
+router.get('/track/:trackingNumber', rateLimiter(120, 60), async (req, res) => {
     try {
         const { trackingNumber } = req.params;
         
@@ -95,7 +95,7 @@ router.get('/track/:trackingNumber', rateLimit, async (req, res) => {
  *       200:
  *         description: Detaylı takip sonucu
  */
-router.get('/track/detail/:trackingNumber', rateLimit, async (req, res) => {
+router.get('/track/detail/:trackingNumber', rateLimiter(120, 60), async (req, res) => {
     try {
         const { trackingNumber } = req.params;
         
@@ -141,7 +141,7 @@ router.get('/track/detail/:trackingNumber', rateLimit, async (req, res) => {
  *       200:
  *         description: Çoklu takip sonucu
  */
-router.post('/track/bulk', auth, rateLimit, async (req, res) => {
+router.post('/track/bulk', auth, rateLimiter(50, 60), async (req, res) => {
     try {
         const { trackingNumbers } = req.body;
         
@@ -213,7 +213,7 @@ router.post('/track/bulk', auth, rateLimit, async (req, res) => {
  *                 type: string
  *                 enum: [STANDARD, EXPRESS, NEXT_DAY, SAME_DAY, ECONOMY, CARGO_PLUS, INTERNATIONAL, COLLECTION]
  */
-router.post('/shipment/create', auth, rateLimit, async (req, res) => {
+router.post('/shipment/create', auth, rateLimiter(50, 60), async (req, res) => {
     try {
         const shipmentData = req.body;
 
@@ -252,7 +252,7 @@ router.post('/shipment/create', auth, rateLimit, async (req, res) => {
  *               reason:
  *                 type: string
  */
-router.post('/shipment/cancel', auth, rateLimit, async (req, res) => {
+router.post('/shipment/cancel', auth, rateLimiter(50, 60), async (req, res) => {
     try {
         const { trackingNumber, reason } = req.body;
         
@@ -300,7 +300,7 @@ router.post('/shipment/cancel', auth, rateLimit, async (req, res) => {
  *               serviceType:
  *                 type: string
  */
-router.post('/pricing/calculate', rateLimit, async (req, res) => {
+router.post('/pricing/calculate', rateLimiter(60, 60), async (req, res) => {
     try {
         const pricingParams = req.body;
 

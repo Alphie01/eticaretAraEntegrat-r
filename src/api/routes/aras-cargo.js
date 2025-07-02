@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const ArasCargoTracker = require('../../services/ArasCargoTracker');
-const auth = require('../../middleware/auth');
+const { protect: auth } = require('../../middleware/auth');
 const rateLimiter = require('../../middleware/rateLimiter');
 const logger = require('../../utils/logger');
 

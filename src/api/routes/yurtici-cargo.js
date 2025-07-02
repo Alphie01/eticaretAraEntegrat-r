@@ -1,6 +1,6 @@
 const express = require('express');
 const YurticiCargoTracker = require('../../services/YurticiCargoTracker');
-const auth = require('../../middleware/auth');
+const { protect: auth } = require('../../middleware/auth');
 const rateLimiter = require('../../middleware/rateLimiter');
 const logger = require('../../utils/logger');
 

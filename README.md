@@ -34,8 +34,8 @@ Node.js tabanlı modüler e-ticaret pazaryeri entegrasyon sistemi. Trendyol, Hep
 
 ### Gereksinimler
 - Node.js 16+
-- MongoDB 4.4+
-- Redis 6+
+- MSSQL Server
+- Redis 6+ (opsiyonel)
 
 ### Hızlı Başlangıç
 
@@ -45,26 +45,44 @@ Node.js tabanlı modüler e-ticaret pazaryeri entegrasyon sistemi. Trendyol, Hep
    cd eticaret-ara-entegrator
    ```
 
-2. **Bağımlılıkları yükleyin**
+2. **Backend bağımlılıklarını yükleyin**
    ```bash
    npm install
    ```
 
-3. **Çevre değişkenlerini ayarlayın**
+3. **Frontend bağımlılıklarını yükleyin**
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+4. **Çevre değişkenlerini ayarlayın**
    ```bash
    cp .env.example .env
    # .env dosyasını düzenleyin
    ```
 
-4. **Veritabanını başlatın**
+5. **Veritabanını başlatın**
    ```bash
    npm run db:seed
    ```
 
-5. **Uygulamayı çalıştırın**
+6. **Backend'i çalıştırın**
    ```bash
    npm run dev
    ```
+
+7. **Frontend'i çalıştırın (yeni terminal)**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
+
+### Erişim Bilgileri
+- **Backend API:** http://localhost:9010
+- **Frontend Dashboard:** http://localhost:3001
+- **API Dokümantasyonu:** http://localhost:9010/docs
 
 ### Docker ile Kurulum
 
@@ -249,5 +267,10 @@ docker run -p 3000:3000 eticaret-entegrator
 Bu proje MIT lisansı altında lisanslanmıştır.
 
 ## 🆘 Destek
+
+Sorularınız için issue açabilir veya email gönderebilirsiniz.
+## 🆘 Destek
+
+Sorularınız için issue açabilir veya email gönderebilirsiniz.
 
 Sorularınız için issue açabilir veya email gönderebilirsiniz.

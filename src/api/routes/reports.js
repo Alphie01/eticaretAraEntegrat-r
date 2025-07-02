@@ -5,6 +5,7 @@ const { Order } = require('../../models/Order');
 const { SyncLog } = require('../../models/SyncLog');
 const logger = require('../../utils/logger');
 const { getSequelize } = require('../../config/database');
+const rateLimiter = require('../../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -621,6 +622,247 @@ router.get('/export', protect, async (req, res) => {
       error: 'Server error while exporting report'
     });
   }
+});
+
+/**
+ * @route GET /api/v1/reports/dashboard-stats
+ * @desc Dashboard istatistikleri
+ * @access Private
+ */
+router.get('/dashboard-stats', protect, rateLimiter(30, 60), async (req, res) => {
+    try {
+        logger.info(`Dashboard stats request by user: ${req.user?.id || 'anonymous'}`);
+        
+        // Mock data - gerçek implementasyon için veritabanından çekilecek
+        const stats = {
+            success: true,
+            result: {
+                totalOrders: 1247,
+                orderGrowth: 12,
+                totalProducts: 3856,
+                productGrowth: 5,
+                totalMarketplaces: 8,
+                marketplaceGrowth: 0,
+                totalShipments: 456,
+                shipmentGrowth: 18,
+                totalRevenue: 125000,
+                revenueGrowth: 15
+            }
+        };
+
+        res.json(stats);
+    } catch (error) {
+        logger.error('Dashboard stats error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Dashboard istatistikleri alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/reports/sales-trends
+ * @desc Satış trendleri
+ * @access Private
+ */
+router.get('/sales-trends', protect, rateLimiter(20, 60), async (req, res) => {
+    try {
+        const { period = '7d' } = req.query;
+        
+        logger.info(`Sales trends request for period: ${period} by user: ${req.user?.id || 'anonymous'}`);
+        
+        // Mock data - gerçek implementasyon için veritabanından çekilecek
+        const salesData = [
+            { name: 'Pzt', orders: 24, revenue: 2400 },
+            { name: 'Sal', orders: 13, revenue: 1398 },
+            { name: 'Çar', orders: 32, revenue: 3200 },
+            { name: 'Per', orders: 28, revenue: 2800 },
+            { name: 'Cum', orders: 45, revenue: 4500 },
+            { name: 'Cmt', orders: 67, revenue: 6700 },
+            { name: 'Paz', orders: 52, revenue: 5200 },
+        ];
+
+        res.json({
+            success: true,
+            result: salesData
+        });
+    } catch (error) {
+        logger.error('Sales trends error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Satış trendleri alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/reports/marketplace-performance
+ * @desc Pazaryeri performansı
+ * @access Private
+ */
+router.get('/marketplace-performance', protect, rateLimiter(20, 60), async (req, res) => {
+    try {
+        logger.info(`Marketplace performance request by user: ${req.user?.id || 'anonymous'}`);
+        
+        // Mock data
+        const marketplaceData = [
+            { name: 'Trendyol', orders: 456, color: '#f27a1a' },
+            { name: 'Hepsiburada', orders: 234, color: '#ff6000' },
+            { name: 'Amazon', orders: 189, color: '#ff9900' },
+            { name: 'N11', orders: 167, color: '#f5a623' },
+            { name: 'Shopify', orders: 145, color: '#95bf47' },
+            { name: 'Diğer', orders: 56, color: '#6c757d' },
+        ];
+
+        res.json({
+            success: true,
+            result: marketplaceData
+        });
+    } catch (error) {
+        logger.error('Marketplace performance error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Pazaryeri performansı alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/reports/cargo-performance
+ * @desc Kargo performansı
+ * @access Private
+ */
+router.get('/cargo-performance', protect, rateLimiter(20, 60), async (req, res) => {
+    try {
+        logger.info(`Cargo performance request by user: ${req.user?.id || 'anonymous'}`);
+        
+        // Mock data
+        const cargoData = {
+            mng: { activeShipments: 145, deliveredShipments: 1234, pendingShipments: 23, success: true },
+            aras: { activeShipments: 89, deliveredShipments: 876, pendingShipments: 12, success: true },
+            ups: { activeShipments: 23, deliveredShipments: 298, pendingShipments: 3, success: true },
+            yurtici: { activeShipments: 67, deliveredShipments: 654, pendingShipments: 8, success: true },
+            surat: { activeShipments: 34, deliveredShipments: 432, pendingShipments: 5, success: true },
+        };
+
+        res.json({
+            success: true,
+            result: cargoData
+        });
+    } catch (error) {
+        logger.error('Cargo performance error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Kargo performansı alınamadı',
+            error: error.message
+        });
+    }
+});
+
+// ***** GEÇICI AUTH-FREE ENDPOINT'LER TEST İÇİN *****
+
+/**
+ * @route GET /api/v1/reports/test/dashboard-stats
+ * @desc Dashboard istatistikleri (Auth-free test)
+ * @access Public
+ */
+router.get('/test/dashboard-stats', rateLimiter(30, 60), async (req, res) => {
+    try {
+        logger.info('Dashboard stats test request (no auth)');
+        
+        const stats = {
+            success: true,
+            result: {
+                totalOrders: 1247,
+                orderGrowth: 12,
+                totalProducts: 3856,
+                productGrowth: 5,
+                totalMarketplaces: 8,
+                marketplaceGrowth: 0,
+                totalShipments: 456,
+                shipmentGrowth: 18,
+                totalRevenue: 125000,
+                revenueGrowth: 15
+            }
+        };
+
+        res.json(stats);
+    } catch (error) {
+        logger.error('Dashboard stats test error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Dashboard istatistikleri alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/reports/test/sales-trends
+ * @desc Satış trendleri (Auth-free test)
+ * @access Public
+ */
+router.get('/test/sales-trends', rateLimiter(20, 60), async (req, res) => {
+    try {
+        logger.info('Sales trends test request (no auth)');
+        
+        const salesData = [
+            { name: 'Pzt', orders: 24, revenue: 2400 },
+            { name: 'Sal', orders: 13, revenue: 1398 },
+            { name: 'Çar', orders: 32, revenue: 3200 },
+            { name: 'Per', orders: 28, revenue: 2800 },
+            { name: 'Cum', orders: 45, revenue: 4500 },
+            { name: 'Cmt', orders: 67, revenue: 6700 },
+            { name: 'Paz', orders: 52, revenue: 5200 },
+        ];
+
+        res.json({
+            success: true,
+            result: salesData
+        });
+    } catch (error) {
+        logger.error('Sales trends test error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Satış trendleri alınamadı',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * @route GET /api/v1/reports/test/marketplace-performance
+ * @desc Pazaryeri performansı (Auth-free test)
+ * @access Public
+ */
+router.get('/test/marketplace-performance', rateLimiter(20, 60), async (req, res) => {
+    try {
+        logger.info('Marketplace performance test request (no auth)');
+        
+        const marketplaceData = [
+            { name: 'Trendyol', orders: 456, color: '#f27a1a' },
+            { name: 'Hepsiburada', orders: 234, color: '#ff6000' },
+            { name: 'Amazon', orders: 189, color: '#ff9900' },
+            { name: 'N11', orders: 167, color: '#f5a623' },
+            { name: 'Shopify', orders: 145, color: '#95bf47' },
+            { name: 'Diğer', orders: 56, color: '#6c757d' },
+        ];
+
+        res.json({
+            success: true,
+            result: marketplaceData
+        });
+    } catch (error) {
+        logger.error('Marketplace performance test error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Pazaryeri performansı alınamadı',
+            error: error.message
+        });
+    }
 });
 
 module.exports = router; 
