@@ -4708,3 +4708,9 @@
 {"code":"ECONNREFUSED","level":"error","message":"Redis connection error:","service":"eticaret-entegrator","stack":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1139:18)\n    at afterConnectMultiple (node:net:1714:7)","timestamp":"2025-06-24T13:46:43.796Z"}
 {"code":"ECONNREFUSED","level":"error","message":"Redis connection failed:","service":"eticaret-entegrator","stack":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1139:18)\n    at afterConnectMultiple (node:net:1714:7)","timestamp":"2025-06-24T13:46:43.797Z"}
 {"code":"ECONNREFUSED","level":"error","message":"Failed to initialize Redis:","service":"eticaret-entegrator","stack":"AggregateError [ECONNREFUSED]: \n    at internalConnectMultiple (node:net:1139:18)\n    at afterConnectMultiple (node:net:1714:7)","timestamp":"2025-06-24T13:46:43.797Z"}
+{"level":"error","message":"MNG Kargo API error:","service":"eticaret-entegrator","timestamp":"2025-07-02T06:59:46.787Z"}
+{"level":"error","message":"MNG Kargo API connection test failed:","service":"eticaret-entegrator","timestamp":"2025-07-02T06:59:46.795Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.775Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.778Z"}
+{"level":"error","message":"Sürat Kargo pricing error:","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.778Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.781Z"}

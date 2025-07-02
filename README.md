@@ -11,6 +11,7 @@ Node.js tabanlı modüler e-ticaret pazaryeri entegrasyon sistemi. Trendyol, Hep
 - **Sipariş Yönetimi**: Tüm platformlardan gelen siparişleri tek yerden takip edin
 - **Raporlama**: Detaylı satış ve performans raporları
 - **API First**: RESTful API ile üçüncü parti entegrasyonlar
+- **Kargo Takip Entegrasyonu**: MNG Kargo, Aras Kargo, UPS Kargo, Yurtiçi Kargo ve Sürat Kargo ile otomatik takip sistemi
 
 ## 🏗️ Mimari
 
@@ -130,6 +131,41 @@ PTTAVM_API_KEY=your_pttavm_api_key
 PTTAVM_API_SECRET=your_pttavm_api_secret
 PTTAVM_SELLER_ID=your_pttavm_seller_id
 PTTAVM_ENVIRONMENT=production
+
+# MNG Kargo API
+MNG_CARGO_API_KEY=your_mng_cargo_api_key
+MNG_CARGO_API_SECRET=your_mng_cargo_api_secret
+MNG_CARGO_COMPANY_CODE=your_mng_company_code
+MNG_CARGO_API_URL=https://api.mngkargo.com.tr
+MNG_CARGO_ENVIRONMENT=production
+
+# Aras Kargo API
+ARAS_CARGO_USERNAME=your_aras_username
+ARAS_CARGO_PASSWORD=your_aras_password
+ARAS_CARGO_CUSTOMER_CODE=your_customer_code
+ARAS_CARGO_API_URL=https://kargotakip.araskargo.com.tr/araskargo.asmx
+ARAS_CARGO_ENVIRONMENT=production
+
+# UPS Kargo API
+UPS_CARGO_API_KEY=your_ups_api_key
+UPS_CARGO_CUSTOMER_CODE=your_ups_customer_code
+UPS_CARGO_API_URL=https://www.ups.com.tr
+UPS_CARGO_ENVIRONMENT=production
+
+# Yurtiçi Kargo API
+YURTICI_CARGO_USERNAME=your_yurtici_username
+YURTICI_CARGO_PASSWORD=your_yurtici_password
+YURTICI_CARGO_LANGUAGE=TR
+YURTICI_CARGO_API_URL=http://webservices.yurticikargo.com:8080
+YURTICI_CARGO_ENVIRONMENT=production
+
+# Sürat Kargo API
+SURAT_CARGO_USERNAME=your_surat_username
+SURAT_CARGO_PASSWORD=your_surat_password
+SURAT_CARGO_CUSTOMER_CODE=your_surat_customer_code
+SURAT_CARGO_LANGUAGE=TR
+SURAT_CARGO_API_URL=https://ws.suratkargo.com.tr
+SURAT_CARGO_ENVIRONMENT=production
 ```
 
 ### Rate Limiting
@@ -167,6 +203,21 @@ node test_pazarama_integration.js
 # Test PTT AVM integration
 node test_pttavm_integration.js
 
+# Test MNG Kargo integration
+node test_mng_cargo_integration.js
+
+# Test Aras Kargo integration
+node test_aras_cargo_integration.js
+
+# Test UPS Kargo integration
+node test_ups_cargo_integration.js
+
+# Test Yurtiçi Kargo integration
+node test_yurtici_cargo_integration.js
+
+# Test Sürat Kargo integration
+node test_surat_cargo_integration.js
+
 # Test cross-platform sync
 node test_cross_platform_sync.js
 ```
@@ -199,4 +250,4 @@ Bu proje MIT lisansı altında lisanslanmıştır.
 
 ## 🆘 Destek
 
-Sorularınız için issue açabilir veya email gönderebilirsiniz. 
+Sorularınız için issue açabilir veya email gönderebilirsiniz.

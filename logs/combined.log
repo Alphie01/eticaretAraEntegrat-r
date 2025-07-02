@@ -8038,3 +8038,16 @@
 {"level":"warn","message":"Shopify integration disabled - missing API credentials in environment variables","service":"eticaret-entegrator","timestamp":"2025-07-01T11:48:43.599Z"}
 {"level":"warn","message":"ÇiçekSepeti integration disabled - missing API credentials in environment variables","service":"eticaret-entegrator","timestamp":"2025-07-01T11:48:43.599Z"}
 {"level":"info","message":"AdapterManager initialized with marketplaces: trendyol","service":"eticaret-entegrator","timestamp":"2025-07-01T11:48:43.599Z"}
+{"level":"error","message":"MNG Kargo API error:","service":"eticaret-entegrator","timestamp":"2025-07-02T06:59:46.787Z"}
+{"level":"error","message":"MNG Kargo API connection test failed:","service":"eticaret-entegrator","timestamp":"2025-07-02T06:59:46.795Z"}
+{"level":"info","message":"UPS Kargo connection test completed","service":"eticaret-entegrator","timestamp":"2025-07-02T07:26:43.872Z"}
+{"level":"info","message":"Yurtiçi Kargo SOAP client initialized","service":"eticaret-entegrator","timestamp":"2025-07-02T08:23:18.803Z"}
+{"level":"info","message":"Yurtiçi Kargo connection test completed","service":"eticaret-entegrator","timestamp":"2025-07-02T08:23:18.813Z"}
+{"failed":0,"level":"info","message":"Yurtiçi Kargo integration test completed","passRate":"100.0","passed":8,"service":"eticaret-entegrator","timestamp":"2025-07-02T08:23:21.830Z","total":8}
+{"level":"info","message":"Sürat Kargo API request: GET /api/v1/status","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.712Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.775Z"}
+{"level":"info","message":"Sürat Kargo API request: POST /api/v1/pricing/calculate","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.775Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.778Z"}
+{"level":"error","message":"Sürat Kargo pricing error:","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.778Z"}
+{"level":"info","message":"Sürat Kargo API request: GET /api/v1/status","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.779Z"}
+{"level":"error","message":"Sürat Kargo API error: getaddrinfo ENOTFOUND ws.suratkargo.com.tr","service":"eticaret-entegrator","timestamp":"2025-07-02T09:03:52.781Z"}

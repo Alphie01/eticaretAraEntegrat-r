@@ -21,6 +21,11 @@ const syncRoutes = require('./api/routes/sync');
 const reportRoutes = require('./api/routes/reports');
 const marketplaceKeysRoutes = require('./api/routes/marketplace-keys');
 const crossPlatformSyncRoutes = require('./api/routes/cross-platform-sync');
+const mngCargoRoutes = require('./api/routes/mng-cargo');
+const arasCargoRoutes = require('./api/routes/aras-cargo');
+const upsCargoRoutes = require('./api/routes/ups-cargo');
+const yurticiCargoRoutes = require('./api/routes/yurtici-cargo');
+const suratCargoRoutes = require('./api/routes/surat-cargo');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -107,6 +112,11 @@ app.use(`${apiPrefix}/sync`, syncRoutes);
 app.use(`${apiPrefix}/sync/cross-platform`, crossPlatformSyncRoutes);
 app.use(`${apiPrefix}/reports`, reportRoutes);
 app.use(`${apiPrefix}/marketplace-keys`, marketplaceKeysRoutes);
+app.use(`${apiPrefix}/mng-cargo`, mngCargoRoutes);
+app.use(`${apiPrefix}/aras-cargo`, arasCargoRoutes);
+app.use(`${apiPrefix}/ups-cargo`, upsCargoRoutes);
+app.use(`${apiPrefix}/yurtici-cargo`, yurticiCargoRoutes);
+app.use(`${apiPrefix}/surat-cargo`, suratCargoRoutes);
 
 // Static files for uploads
 app.use('/uploads', express.static('uploads'));
