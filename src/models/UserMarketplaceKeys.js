@@ -3,19 +3,36 @@ const { getSequelize } = require('../config/database');
 const { encrypt, decrypt } = require('../utils/encryption');
 
 class UserMarketplaceKeys extends Model {
+  // Safe decryption method that handles both encrypted and non-encrypted data
+  safeDecrypt(value) {
+    if (!value) return null;
+    
+    // If the value doesn't contain ':' it's likely not encrypted
+    if (!value.includes(':')) {
+      return value; // Return as plain text
+    }
+    
+    try {
+      return decrypt(value);
+    } catch (error) {
+      console.warn(`Failed to decrypt value, returning as plain text: ${error.message}`);
+      return value; // Return as plain text if decryption fails
+    }
+  }
+
   // API key'i deşifrele
   getDecryptedApiKey() {
-    return decrypt(this.encrypted_api_key);
+    return this.safeDecrypt(this.encrypted_api_key);
   }
 
   // API secret'ı deşifrele
   getDecryptedApiSecret() {
-    return decrypt(this.encrypted_api_secret);
+    return this.safeDecrypt(this.encrypted_api_secret);
   }
 
   // Supplier ID'yi deşifrele (Trendyol için)
   getDecryptedSupplierId() {
-    return decrypt(this.encrypted_supplier_id);
+    return this.safeDecrypt(this.encrypted_supplier_id);
   }
 
   // Tüm credentials'ı deşifrele (marketplace'e göre farklı formatlarda)

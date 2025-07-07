@@ -1,9 +1,9 @@
 import api from './api'
 
 export const marketplaceService = {
-  // Get all marketplaces status
+  // Get all marketplaces status and credentials
   getMarketplaces: () => 
-    api.get('/marketplace/status'),
+    api.get('/marketplace-keys'),
 
   // Get marketplace statistics
   getMarketplaceStats: () => 

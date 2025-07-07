@@ -31,8 +31,11 @@ import {
   NotificationsNone as NotificationIcon,
   AccountCircle as AccountIcon,
   ChevronLeft as ChevronLeftIcon,
+  Logout as LogoutIcon,
+  BugReport as BugReportIcon,
 } from '@mui/icons-material'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 
 const drawerWidth = 280
 
@@ -44,6 +47,9 @@ const menuItems = [
   { title: 'Ürünler', path: '/products', icon: <ProductIcon /> },
   { title: 'Raporlar', path: '/reports', icon: <ReportIcon /> },
   { title: 'Ayarlar', path: '/settings', icon: <SettingsIcon /> },
+  ...(process.env.NODE_ENV === 'development' ? [
+    { title: 'Error Demo', path: '/error-demo', icon: <BugReportIcon /> }
+  ] : [])
 ]
 
 function Layout({ children }) {
@@ -51,6 +57,7 @@ function Layout({ children }) {
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'))
   const navigate = useNavigate()
   const location = useLocation()
+  const { user, logout } = useAuth()
 
   const [mobileOpen, setMobileOpen] = useState(false)
   const [anchorEl, setAnchorEl] = useState(null)
@@ -67,11 +74,28 @@ function Layout({ children }) {
     setAnchorEl(null)
   }
 
+  const handleLogout = async () => {
+    handleProfileMenuClose()
+    await logout()
+    navigate('/login')
+  }
+
   const handleNavigation = (path) => {
     navigate(path)
     if (isMobile) {
       setMobileOpen(false)
     }
+  }
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user?.name) return 'U'
+    return user.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
   }
 
   const drawer = (
@@ -125,8 +149,21 @@ function Layout({ children }) {
         })}
       </List>
 
-      {/* Footer */}
+      {/* User Info */}
       <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+          <Avatar sx={{ width: 32, height: 32, mr: 2, bgcolor: 'primary.main' }}>
+            {getUserInitials()}
+          </Avatar>
+          <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.85rem' }} noWrap>
+              {user?.name || 'Kullanıcı'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" noWrap>
+              {user?.email || ''}
+            </Typography>
+          </Box>
+        </Box>
         <Typography variant="caption" color="text.secondary">
           v1.0.0 - E-ticaret Entegratör
         </Typography>
@@ -173,7 +210,9 @@ function Layout({ children }) {
             </IconButton>
 
             <IconButton color="inherit" onClick={handleProfileMenuOpen}>
-              <Avatar sx={{ width: 32, height: 32 }}>A</Avatar>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main' }}>
+                {getUserInitials()}
+              </Avatar>
             </IconButton>
           </Box>
         </Toolbar>
@@ -192,17 +231,30 @@ function Layout({ children }) {
           vertical: 'top',
           horizontal: 'right',
         }}
+        PaperProps={{
+          sx: { mt: 1, minWidth: 200 }
+        }}
       >
-        <MenuItem onClick={handleProfileMenuClose}>
-          <AccountIcon sx={{ mr: 1 }} />
+        <Box sx={{ px: 2, py: 1.5, borderBottom: 1, borderColor: 'divider' }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {user?.name || 'Kullanıcı'}
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            {user?.email || ''}
+          </Typography>
+        </Box>
+        
+        <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/settings'); }}>
+          <AccountIcon sx={{ mr: 2 }} />
           Profil
         </MenuItem>
-        <MenuItem onClick={handleProfileMenuClose}>
-          <SettingsIcon sx={{ mr: 1 }} />
+        <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/settings'); }}>
+          <SettingsIcon sx={{ mr: 2 }} />
           Ayarlar
         </MenuItem>
         <Divider />
-        <MenuItem onClick={handleProfileMenuClose}>
+        <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
+          <LogoutIcon sx={{ mr: 2 }} />
           Çıkış Yap
         </MenuItem>
       </Menu>

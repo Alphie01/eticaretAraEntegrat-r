@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
+const session = require('express-session');
+const passport = require('./config/passport');
 require('dotenv').config();
 
 const { connectDB, closeDB, testConnection } = require('./config/database');
@@ -26,6 +28,7 @@ const arasCargoRoutes = require('./api/routes/aras-cargo');
 const upsCargoRoutes = require('./api/routes/ups-cargo');
 const yurticiCargoRoutes = require('./api/routes/yurtici-cargo');
 const suratCargoRoutes = require('./api/routes/surat-cargo');
+const errorRoutes = require('./api/routes/errors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -58,9 +61,6 @@ const initializeRedis = async () => {
 initializeDatabase();
 //initializeRedis();
 
-
-
-
 // Middleware
 app.use(helmet());
 app.use(compression());
@@ -71,6 +71,21 @@ app.use(cors({
 app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Session configuration for OAuth
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'eticaret-entegrator-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport
+app.use(passport.initialize());
+app.use(passport.session());
 
 // Rate limiting
 /* app.use(rateLimiter); */
@@ -95,6 +110,7 @@ app.get('/health', async (req, res) => {
   const isHealthy = dbStatus.success;
   
   res.status(isHealthy ? 200 : 503).json({
+    success: isHealthy,
     status: isHealthy ? 'OK' : 'Service Unavailable',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
@@ -107,6 +123,38 @@ app.get('/health', async (req, res) => {
 
 // API Routes
 const apiPrefix = process.env.API_PREFIX || '/api/v1';
+
+// Health check with API prefix
+app.get(`${apiPrefix}/health`, async (req, res) => {
+  let dbStatus = { success: false, message: 'Database not initialized' };
+  let redisStatus = { success: false, message: 'Redis not initialized' };
+  
+  try {
+    dbStatus = await testConnection();
+  } catch (error) {
+    dbStatus = { success: false, message: 'Database connection failed' };
+  }
+  
+  try {
+    redisStatus = await testRedisConnection();
+  } catch (error) {
+    redisStatus = { success: false, message: 'Redis connection failed' };
+  }
+  
+  const isHealthy = dbStatus.success;
+  
+  res.status(isHealthy ? 200 : 503).json({
+    success: isHealthy,
+    status: isHealthy ? 'OK' : 'Service Unavailable',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    services: {
+      database: dbStatus,
+      redis: redisStatus
+    }
+  });
+});
+
 app.use(`${apiPrefix}/auth`, authRoutes);
 app.use(`${apiPrefix}/products`, productRoutes);
 app.use(`${apiPrefix}/orders`, orderRoutes);
@@ -120,6 +168,7 @@ app.use(`${apiPrefix}/aras-cargo`, arasCargoRoutes);
 app.use(`${apiPrefix}/ups-cargo`, upsCargoRoutes);
 app.use(`${apiPrefix}/yurtici-cargo`, yurticiCargoRoutes);
 app.use(`${apiPrefix}/surat-cargo`, suratCargoRoutes);
+app.use(`${apiPrefix}/errors`, errorRoutes);
 
 // Static files for uploads
 app.use('/uploads', express.static('uploads'));

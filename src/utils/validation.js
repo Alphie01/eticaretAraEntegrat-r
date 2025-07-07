@@ -430,6 +430,38 @@ const validateQuery = (schema) => {
   };
 };
 
+// API Key validation helper
+const validateApiKey = (apiKey) => {
+  // Basic API key validation
+  if (!apiKey || typeof apiKey !== 'string') {
+    return false;
+  }
+
+  // Remove whitespace
+  apiKey = apiKey.trim();
+
+  // Check minimum length
+  if (apiKey.length < 10) {
+    return false;
+  }
+
+  // Check for suspicious patterns
+  const suspiciousPatterns = [
+    /^test/i,
+    /^demo/i,
+    /^example/i,
+    /^placeholder/i
+  ];
+
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(apiKey)) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 module.exports = {
   userSchemas,
   productSchemas,
@@ -438,5 +470,6 @@ module.exports = {
   reportSchemas,
   marketplaceSchemas,
   validateBody,
-  validateQuery
+  validateQuery,
+  validateApiKey
 }; 

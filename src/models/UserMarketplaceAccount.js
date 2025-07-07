@@ -56,6 +56,7 @@ const associateUserMarketplaceAccount = () => {
   const User = require('./User').User;
   const UserMarketplaceCredentials = require('./UserMarketplaceCredentials').UserMarketplaceCredentials;
   const UserMarketplaceSettings = require('./UserMarketplaceSettings').UserMarketplaceSettings;
+  const UserMarketplace = require('./UserMarketplace').UserMarketplace;
 
   // UserMarketplaceAccount belongs to User
   UserMarketplaceAccount.belongsTo(User, { 
@@ -63,7 +64,7 @@ const associateUserMarketplaceAccount = () => {
     as: 'user' 
   });
 
-  // UserMarketplaceAccount has one credentials
+  // UserMarketplaceAccount has one credentials (legacy)
   UserMarketplaceAccount.hasOne(UserMarketplaceCredentials, { 
     foreignKey: 'marketplace_account_id', 
     as: 'credentials' 
@@ -73,6 +74,12 @@ const associateUserMarketplaceAccount = () => {
   UserMarketplaceAccount.hasOne(UserMarketplaceSettings, { 
     foreignKey: 'marketplace_account_id', 
     as: 'settings' 
+  });
+
+  // UserMarketplaceAccount has one marketplace credentials (new)
+  UserMarketplaceAccount.hasOne(UserMarketplace, { 
+    foreignKey: 'marketplace_account_id', 
+    as: 'marketplaceCredentials' 
   });
 };
 

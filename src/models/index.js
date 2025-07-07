@@ -12,6 +12,7 @@ const { UserMarketplaceSettings, initUserMarketplaceSettings, associateUserMarke
 const { UserPreferences, initUserPreferences, associateUserPreferences } = require('./UserPreferences');
 const { UserNotificationSettings, initUserNotificationSettings, associateUserNotificationSettings } = require('./UserNotificationSettings');
 const { UserMarketplaceKeys, initUserMarketplaceKeys, associateUserMarketplaceKeys } = require('./UserMarketplaceKeys');
+const { UserMarketplace, initUserMarketplace, associateUserMarketplace } = require('./UserMarketplace');
 
 // Product related models
 const { Product, initProduct, associateProduct } = require('./Product');
@@ -50,6 +51,7 @@ const initModels = () => {
     initUserPreferences();
     initUserNotificationSettings();
     initUserMarketplaceKeys();
+    initUserMarketplace();
 
     // Initialize product models
     initProductCategory();
@@ -90,6 +92,7 @@ const associateModels = () => {
     associateUserPreferences();
     associateUserNotificationSettings();
     associateUserMarketplaceKeys();
+    associateUserMarketplace();
 
     // Associate product models
     associateProductCategory();
@@ -151,6 +154,7 @@ module.exports = {
   UserPreferences,
   UserNotificationSettings,
   UserMarketplaceKeys,
+  UserMarketplace,
   
   // Product related models
   Product,

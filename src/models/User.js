@@ -7,6 +7,10 @@ const { getSequelize } = require('../config/database');
 class User extends Model {
   // Password verification method
   async matchPassword(enteredPassword) {
+    // Skip password check only for explicitly OAuth users or users without password
+    if ((this.oauth_provider && this.oauth_provider !== 'local') || !this.password_hash) {
+      return false;
+    }
     return await bcrypt.compare(enteredPassword, this.password_hash);
   }
 
@@ -32,7 +36,7 @@ class User extends Model {
     
     return resetToken;
   }
-
+  
   // Check if account is locked
   get isLocked() {
     return !!(this.lock_until && this.lock_until > new Date());
@@ -107,6 +111,31 @@ class User extends Model {
     
     return result[0].count > 0;
   }
+
+  // Check if user is OAuth user
+  isOAuthUser() {
+    return this.oauth_provider && this.oauth_provider !== 'local';
+  }
+
+  // Get OAuth profile data
+  getOAuthProfile() {
+    return {
+      provider: this.oauth_provider,
+      google_id: this.google_id,
+      facebook_id: this.facebook_id,
+      apple_id: this.apple_id,
+      avatar_url: this.avatar_url,
+      email_verified: this.email_verified
+    };
+  }
+
+  // Update OAuth tokens
+  async updateOAuthTokens(accessToken, refreshToken = null) {
+    await this.update({
+      oauth_access_token: accessToken,
+      oauth_refresh_token: refreshToken
+    });
+  }
 }
 
 // Initialize User model
@@ -138,7 +167,7 @@ const initUser = () => {
     },
     password_hash: {
       type: DataTypes.STRING(255),
-      allowNull: false,
+      allowNull: true, // Allow null for OAuth users
       field: 'password_hash'
     },
     role_id: {
@@ -171,6 +200,42 @@ const initUser = () => {
     },
     lock_until: {
       type: DataTypes.DATE,
+      allowNull: true
+    },
+    // OAuth fields
+    google_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      unique: true
+    },
+    facebook_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      unique: true
+    },
+    apple_id: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      unique: true
+    },
+    avatar_url: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    email_verified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    oauth_provider: {
+      type: DataTypes.ENUM('local', 'google', 'facebook', 'apple'),
+      defaultValue: 'local'
+    },
+    oauth_access_token: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    oauth_refresh_token: {
+      type: DataTypes.TEXT,
       allowNull: true
     }
   }, {

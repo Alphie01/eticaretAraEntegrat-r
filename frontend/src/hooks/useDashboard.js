@@ -3,9 +3,12 @@ import dashboardService from '../services/dashboardService'
 import marketplaceService from '../services/marketplaceService'
 import cargoService from '../services/cargoService'
 import toast from 'react-hot-toast'
+import { useError } from '../contexts/ErrorContext'
 
 // Get dashboard statistics
 export const useDashboardStats = () => {
+  const { handleApiError } = useError()
+
   return useQuery(
     ['dashboard', 'stats'],
     () => dashboardService.getStats(),
@@ -26,6 +29,7 @@ export const useDashboardStats = () => {
       },
       onError: (error) => {
         console.error('Dashboard stats error:', error)
+        handleApiError(error, 'Dashboard Statistics')
         toast.error('Dashboard istatistikleri alınamadı', { id: 'dashboard-stats-error' })
       }
     }
@@ -34,6 +38,8 @@ export const useDashboardStats = () => {
 
 // Get recent orders
 export const useRecentOrders = (limit = 10) => {
+  const { handleApiError } = useError()
+
   return useQuery(
     ['dashboard', 'recentOrders', limit],
     () => dashboardService.getRecentOrders(limit),
@@ -53,6 +59,7 @@ export const useRecentOrders = (limit = 10) => {
       },
       onError: (error) => {
         console.error('Recent orders error:', error)
+        handleApiError(error, 'Recent Orders')
         toast.error('Son siparişler alınamadı', { id: 'recent-orders-error' })
       }
     }
@@ -241,6 +248,10 @@ export const useDashboardData = () => {
   const marketplacePerformance = useMarketplacePerformance()
   const cargoPerformance = useCargoPerformance()
 
+  // Only consider critical endpoints for loading and error states
+  const criticalLoading = stats.isLoading || recentOrders.isLoading || salesTrends.isLoading || marketplacePerformance.isLoading
+  const criticalError = stats.isError || recentOrders.isError || salesTrends.isError || marketplacePerformance.isError
+
   return {
     stats,
     recentOrders,
@@ -248,8 +259,8 @@ export const useDashboardData = () => {
     salesTrends,
     marketplacePerformance,
     cargoPerformance,
-    isLoading: stats.isLoading || recentOrders.isLoading || health.isLoading,
-    isError: stats.isError || recentOrders.isError || health.isError,
+    isLoading: criticalLoading,
+    isError: criticalError,
     refetchAll: () => {
       stats.refetch()
       recentOrders.refetch()

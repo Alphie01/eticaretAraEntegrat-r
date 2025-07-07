@@ -2,6 +2,7 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const passport = require('../../config/passport'); // Import passport config
 const { protect, authorize } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
 
@@ -51,6 +52,124 @@ router.get('/test', (req, res) => {
     message: 'Auth route is working',
     timestamp: new Date().toISOString()
   });
+});
+
+// @desc    Debug - Check demo user
+// @route   GET /api/v1/auth/debug
+// @access  Public
+router.get('/debug', async (req, res) => {
+  try {
+    // Check if demo user exists (now with OAuth fields)
+    const demoUser = await User.findOne({ 
+      where: { email: 'demo@eticaret.com' },
+      attributes: ['id', 'name', 'email', 'oauth_provider', 'password_hash', 'google_id', 'facebook_id', 'apple_id', 'email_verified']
+    });
+
+    // Count all users
+    const userCount = await User.count();
+
+    res.json({
+      success: true,
+      data: {
+        demoUserExists: !!demoUser,
+        demoUser: demoUser ? {
+          id: demoUser.id,
+          name: demoUser.name,
+          email: demoUser.email,
+          oauth_provider: demoUser.oauth_provider,
+          hasPassword: !!demoUser.password_hash,
+          google_id: demoUser.google_id,
+          facebook_id: demoUser.facebook_id,
+          apple_id: demoUser.apple_id,
+          email_verified: demoUser.email_verified
+        } : null,
+        totalUsers: userCount
+      }
+    });
+  } catch (error) {
+    logger.error('Debug endpoint failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// @desc    Run OAuth Migration
+// @route   POST /api/v1/auth/migrate-oauth
+// @access  Public
+router.post('/migrate-oauth', async (req, res) => {
+  try {
+    const { getSequelize } = require('../../config/database');
+    const sequelize = getSequelize();
+    
+    // Check if OAuth columns already exist
+    const checkColumnsSQL = `
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'users' 
+      AND COLUMN_NAME IN ('google_id', 'facebook_id', 'apple_id', 'avatar_url', 'email_verified', 'oauth_provider', 'oauth_access_token', 'oauth_refresh_token')
+    `;
+    
+    const existingColumns = await sequelize.query(checkColumnsSQL, { 
+      type: sequelize.QueryTypes.SELECT 
+    });
+    
+    const existingColumnNames = existingColumns.map(col => col.COLUMN_NAME);
+    
+    // Add columns one by one if they don't exist
+    const columnsToAdd = [
+      { name: 'google_id', sql: 'ALTER TABLE users ADD google_id NVARCHAR(255) NULL' },
+      { name: 'facebook_id', sql: 'ALTER TABLE users ADD facebook_id NVARCHAR(255) NULL' },
+      { name: 'apple_id', sql: 'ALTER TABLE users ADD apple_id NVARCHAR(255) NULL' },
+      { name: 'avatar_url', sql: 'ALTER TABLE users ADD avatar_url NTEXT NULL' },
+      { name: 'email_verified', sql: 'ALTER TABLE users ADD email_verified BIT NOT NULL DEFAULT 0' },
+      { name: 'oauth_provider', sql: 'ALTER TABLE users ADD oauth_provider NVARCHAR(20) NOT NULL DEFAULT \'local\'' },
+      { name: 'oauth_access_token', sql: 'ALTER TABLE users ADD oauth_access_token NTEXT NULL' },
+      { name: 'oauth_refresh_token', sql: 'ALTER TABLE users ADD oauth_refresh_token NTEXT NULL' }
+    ];
+    
+    const results = [];
+    
+    for (const column of columnsToAdd) {
+      if (!existingColumnNames.includes(column.name)) {
+        try {
+          await sequelize.query(column.sql, { type: sequelize.QueryTypes.RAW });
+          results.push(`Added column: ${column.name}`);
+          logger.info(`Added OAuth column: ${column.name}`);
+        } catch (error) {
+          results.push(`Failed to add column ${column.name}: ${error.message}`);
+          logger.error(`Failed to add OAuth column ${column.name}:`, error);
+        }
+      } else {
+        results.push(`Column already exists: ${column.name}`);
+      }
+    }
+    
+    // Update existing users to have 'local' oauth_provider
+    try {
+      await sequelize.query(
+        'UPDATE users SET oauth_provider = \'local\' WHERE oauth_provider IS NULL OR oauth_provider = \'\'', 
+        { type: sequelize.QueryTypes.UPDATE }
+      );
+      results.push('Updated existing users oauth_provider to local');
+    } catch (error) {
+      results.push(`Failed to update oauth_provider: ${error.message}`);
+    }
+    
+    logger.info('OAuth migration completed via API');
+    res.json({
+      success: true,
+      message: 'OAuth migration completed',
+      results: results
+    });
+  } catch (error) {
+    logger.error('OAuth migration via API failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
 });
 
 // @desc    Register user
@@ -422,6 +541,165 @@ router.put('/marketplace/:marketplace', protect, async (req, res) => {
     });
   } catch (error) {
     logger.error('Marketplace account update failed:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// =======================
+// OAuth Routes
+// =======================
+
+// @desc    Google OAuth
+// @route   GET /api/v1/auth/google
+// @access  Public
+router.get('/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+// @desc    Google OAuth callback
+// @route   GET /api/v1/auth/google/callback
+// @access  Public
+router.get('/google/callback', 
+  passport.authenticate('google', { session: false }),
+  (req, res) => {
+    try {
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: req.user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
+
+      // Redirect to frontend with token
+      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3003';
+      res.redirect(`${frontendURL}/auth/callback?token=${token}&provider=google`);
+    } catch (error) {
+      logger.error('Google OAuth callback error:', error);
+      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3003';
+      res.redirect(`${frontendURL}/auth/callback?error=oauth_failed`);
+    }
+  }
+);
+
+// @desc    Facebook OAuth
+// @route   GET /api/v1/auth/facebook
+// @access  Public
+router.get('/facebook', passport.authenticate('facebook', {
+  scope: ['email', 'public_profile']
+}));
+
+// @desc    Facebook OAuth callback
+// @route   GET /api/v1/auth/facebook/callback
+// @access  Public
+router.get('/facebook/callback', 
+  passport.authenticate('facebook', { session: false }),
+  (req, res) => {
+    try {
+      // Generate JWT token
+      const token = jwt.sign(
+        { id: req.user.id },
+        process.env.JWT_SECRET,
+        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      );
+
+      // Redirect to frontend with token
+      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3003';
+      res.redirect(`${frontendURL}/auth/callback?token=${token}&provider=facebook`);
+    } catch (error) {
+      logger.error('Facebook OAuth callback error:', error);
+      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3003';
+      res.redirect(`${frontendURL}/auth/callback?error=oauth_failed`);
+    }
+  }
+);
+
+// @desc    Apple OAuth (placeholder for future implementation)
+// @route   GET /api/v1/auth/apple
+// @access  Public
+router.get('/apple', (req, res) => {
+  res.status(501).json({
+    success: false,
+    message: 'Apple Sign-In not yet implemented'
+  });
+});
+
+// @desc    Link OAuth account to existing user
+// @route   POST /api/v1/auth/link-oauth
+// @access  Private
+router.post('/link-oauth', protect, async (req, res) => {
+  try {
+    const { provider, oauth_id, avatar_url } = req.body;
+    
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid OAuth provider'
+      });
+    }
+
+    const updateData = {};
+    updateData[`${provider}_id`] = oauth_id;
+    updateData.avatar_url = avatar_url;
+
+    await req.user.update(updateData);
+
+    logger.info(`${provider} account linked to user: ${req.user.email}`);
+    res.status(200).json({
+      success: true,
+      message: `${provider} account linked successfully`,
+      user: req.user
+    });
+  } catch (error) {
+    logger.error('Link OAuth account failed:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// @desc    Unlink OAuth account
+// @route   DELETE /api/v1/auth/unlink-oauth/:provider
+// @access  Private
+router.delete('/unlink-oauth/:provider', protect, async (req, res) => {
+  try {
+    const { provider } = req.params;
+    
+    if (!['google', 'facebook', 'apple'].includes(provider)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid OAuth provider'
+      });
+    }
+
+    // Check if user has password (can't unlink if OAuth is only auth method)
+    if (!req.user.password_hash && req.user.oauth_provider === provider) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot unlink the only authentication method. Please set a password first.'
+      });
+    }
+
+    const updateData = {};
+    updateData[`${provider}_id`] = null;
+    
+    // If this was the primary OAuth provider, reset to local
+    if (req.user.oauth_provider === provider) {
+      updateData.oauth_provider = 'local';
+    }
+
+    await req.user.update(updateData);
+
+    logger.info(`${provider} account unlinked from user: ${req.user.email}`);
+    res.status(200).json({
+      success: true,
+      message: `${provider} account unlinked successfully`
+    });
+  } catch (error) {
+    logger.error('Unlink OAuth account failed:', error);
     res.status(400).json({
       success: false,
       error: error.message

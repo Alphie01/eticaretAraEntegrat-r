@@ -44,6 +44,8 @@ class Product extends Model {
     return Math.min(...variants.map(v => v.price || 0));
   }
 
+
+  
   // Get maximum price from variants
   async getMaxPrice() {
     const variants = await this.getVariants();

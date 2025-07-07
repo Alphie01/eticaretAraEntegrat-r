@@ -1,8 +1,14 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
-import { CssBaseline } from '@mui/material'
+import { CssBaseline, Box, CircularProgress } from '@mui/material'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ErrorProvider } from './contexts/ErrorContext'
+import ErrorBoundary from './components/ErrorBoundary/ErrorBoundary'
+import ErrorNotification from './components/ErrorNotification/ErrorNotification'
 import Layout from './components/Layout/Layout'
+import Login from './pages/Login'
+import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
 import Marketplaces from './pages/Marketplaces'
 import CargoTracking from './pages/CargoTracking'
@@ -10,6 +16,7 @@ import Orders from './pages/Orders'
 import Products from './pages/Products'
 import Reports from './pages/Reports'
 import Settings from './pages/Settings'
+import ErrorDemo from './pages/ErrorDemo'
 
 // Material-UI tema ayarları
 const theme = createTheme({
@@ -117,23 +124,148 @@ const theme = createTheme({
   },
 })
 
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          backgroundColor: 'background.default'
+        }}
+      >
+        <CircularProgress size={40} />
+      </Box>
+    );
+  }
+
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
+
+// App Routes Component
+const AppRoutes = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          minHeight: '100vh',
+          backgroundColor: 'background.default'
+        }}
+      >
+        <CircularProgress size={40} />
+      </Box>
+    );
+  }
+
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      
+      {/* Protected Routes */}
+      <Route path="/" element={
+        <ProtectedRoute>
+          <Layout>
+            <Navigate to="/dashboard" replace />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <Layout>
+            <Dashboard />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/marketplaces" element={
+        <ProtectedRoute>
+          <Layout>
+            <Marketplaces />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/cargo-tracking" element={
+        <ProtectedRoute>
+          <Layout>
+            <CargoTracking />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/orders" element={
+        <ProtectedRoute>
+          <Layout>
+            <Orders />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/products" element={
+        <ProtectedRoute>
+          <Layout>
+            <Products />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/reports" element={
+        <ProtectedRoute>
+          <Layout>
+            <Reports />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <Layout>
+            <Settings />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/error-demo" element={
+        <ProtectedRoute>
+          <Layout>
+            <ErrorDemo />
+          </Layout>
+        </ProtectedRoute>
+      } />
+      
+      {/* Catch all route */}
+      <Route path="*" element={
+        isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
+      } />
+    </Routes>
+  );
+};
+
 function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/marketplaces" element={<Marketplaces />} />
-          <Route path="/cargo-tracking" element={<CargoTracking />} />
-          <Route path="/orders" element={<Orders />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
-      </Layout>
+      <ErrorProvider>
+        <ErrorBoundary level="app" componentName="App">
+      <AuthProvider>
+        <AppRoutes />
+            <ErrorNotification />
+      </AuthProvider>
+        </ErrorBoundary>
+      </ErrorProvider>
     </ThemeProvider>
   )
 }

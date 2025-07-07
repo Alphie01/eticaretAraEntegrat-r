@@ -45,24 +45,22 @@ import {
 } from 'recharts'
 import { useDashboardData } from '../hooks/useDashboard'
 import { useCargoStatus } from '../hooks/useCargoTracking'
-import { useMarketplaces } from '../hooks/useMarketplaces'
-import toast from 'react-hot-toast'
 
-// Mock data
-const statsData = [
+// Fallback mock data - only used if API fails
+const fallbackStatsData = [
   {
     title: 'Toplam Sipariş',
-    value: '1,247',
-    change: '+12%',
-    changeType: 'positive',
+    value: '0',
+    change: '+0%',
+    changeType: 'neutral',
     icon: <OrderIcon />,
     color: '#1976d2',
   },
   {
     title: 'Aktif Ürün',
-    value: '3,856',
-    change: '+5%',
-    changeType: 'positive',
+    value: '0',
+    change: '+0%',
+    changeType: 'neutral',
     icon: <ProductIcon />,
     color: '#2e7d32',
   },
@@ -76,22 +74,22 @@ const statsData = [
   },
   {
     title: 'Kargo Takip',
-    value: '456',
-    change: '+18%',
-    changeType: 'positive',
+    value: '0',
+    change: '+0%',
+    changeType: 'neutral',
     icon: <ShippingIcon />,
     color: '#9c27b0',
   },
 ]
 
-const recentOrders = [
+const fallbackRecentOrders = [
   { id: '#12345', platform: 'Trendyol', amount: '₺245', status: 'delivered', time: '2 saat önce' },
   { id: '#12344', platform: 'Hepsiburada', amount: '₺189', status: 'shipped', time: '4 saat önce' },
   { id: '#12343', platform: 'Amazon', amount: '₺456', status: 'processing', time: '6 saat önce' },
   { id: '#12342', platform: 'N11', amount: '₺129', status: 'pending', time: '8 saat önce' },
 ]
 
-const marketplaceData = [
+const fallbackMarketplaceData = [
   { name: 'Trendyol', orders: 456, color: '#f27a1a' },
   { name: 'Hepsiburada', orders: 234, color: '#ff6000' },
   { name: 'Amazon', orders: 189, color: '#ff9900' },
@@ -100,7 +98,7 @@ const marketplaceData = [
   { name: 'Diğer', orders: 56, color: '#6c757d' },
 ]
 
-const salesData = [
+const fallbackSalesData = [
   { name: 'Pzt', orders: 24, revenue: 2400 },
   { name: 'Sal', orders: 13, revenue: 1398 },
   { name: 'Çar', orders: 32, revenue: 3200 },
@@ -110,7 +108,7 @@ const salesData = [
   { name: 'Paz', orders: 52, revenue: 5200 },
 ]
 
-const cargoStatus = [
+const fallbackCargoStatus = [
   { company: 'MNG Kargo', active: 145, delivered: 1234, pending: 23, status: 'active' },
   { company: 'Aras Kargo', active: 89, delivered: 876, pending: 12, status: 'active' },
   { company: 'Yurtiçi Kargo', active: 67, delivered: 654, pending: 8, status: 'active' },
@@ -203,7 +201,6 @@ function Dashboard() {
   } = useDashboardData()
 
   const { data: cargoStatusData, isLoading: cargoLoading } = useCargoStatus()
-  const { data: marketplacesData, isLoading: marketplacesLoading } = useMarketplaces()
 
   // Loading state
   if (isLoading) {
@@ -214,8 +211,8 @@ function Dashboard() {
     )
   }
 
-  // Error state
-  if (isError) {
+  // Error state - only show if critical data is missing
+  if (isError && (!stats || !recentOrders || !salesTrends || !marketplacePerformance)) {
     return (
       <Box className="fade-in">
         <Alert 
@@ -233,59 +230,64 @@ function Dashboard() {
   }
 
   // Use API data or fallback to mock data
-  const actualStatsData = stats?.data?.success ? [
+  const actualStatsData = stats?.success ? [
     {
       title: 'Toplam Sipariş',
-      value: stats.data.result?.totalOrders?.toString() || '0',
-      change: `+${stats.data.result?.orderGrowth || 0}%`,
-      changeType: 'positive',
+      value: stats.result?.totalOrders?.toString() || '0',
+      change: `${stats.result?.orderGrowth >= 0 ? '+' : ''}${stats.result?.orderGrowth || 0}%`,
+      changeType: stats.result?.orderGrowth > 0 ? 'positive' : stats.result?.orderGrowth < 0 ? 'negative' : 'neutral',
       icon: <OrderIcon />,
       color: '#1976d2',
     },
     {
       title: 'Aktif Ürün',
-      value: stats.data.result?.totalProducts?.toString() || '0',
-      change: `+${stats.data.result?.productGrowth || 0}%`,
-      changeType: 'positive',
+      value: stats.result?.totalProducts?.toString() || '0',
+      change: `${stats.result?.productGrowth >= 0 ? '+' : ''}${stats.result?.productGrowth || 0}%`,
+      changeType: stats.result?.productGrowth > 0 ? 'positive' : stats.result?.productGrowth < 0 ? 'negative' : 'neutral',
       icon: <ProductIcon />,
       color: '#2e7d32',
     },
     {
       title: 'Pazaryeri',
-      value: stats.data.result?.totalMarketplaces?.toString() || '8',
-      change: '0%',
+      value: stats.result?.totalMarketplaces?.toString() || '8',
+      change: `${stats.result?.marketplaceGrowth >= 0 ? '+' : ''}${stats.result?.marketplaceGrowth || 0}%`,
       changeType: 'neutral',
       icon: <StoreIcon />,
       color: '#ed6c02',
     },
     {
       title: 'Kargo Takip',
-      value: stats.data.result?.totalShipments?.toString() || '0',
-      change: `+${stats.data.result?.shipmentGrowth || 0}%`,
-      changeType: 'positive',
+      value: stats.result?.totalShipments?.toString() || '0',
+      change: `${stats.result?.shipmentGrowth >= 0 ? '+' : ''}${stats.result?.shipmentGrowth || 0}%`,
+      changeType: stats.result?.shipmentGrowth > 0 ? 'positive' : stats.result?.shipmentGrowth < 0 ? 'negative' : 'neutral',
       icon: <ShippingIcon />,
       color: '#9c27b0',
     },
-  ] : statsData
+  ] : fallbackStatsData
 
-  const actualRecentOrders = recentOrders?.data?.success ? recentOrders.data.result : recentOrders
-  const actualSalesData = salesTrends?.data?.success ? salesTrends.data.result : salesData
-  const actualMarketplaceData = marketplacePerformance?.data?.success ? marketplacePerformance.data.result : marketplaceData
+  const actualRecentOrders = recentOrders?.success ? recentOrders.result : fallbackRecentOrders
+  const actualSalesData = salesTrends?.success ? salesTrends.result : fallbackSalesData
+  const actualMarketplaceData = marketplacePerformance?.success ? marketplacePerformance.result : fallbackMarketplaceData
   const actualCargoStatus = cargoStatusData?.success ? Object.entries(cargoStatusData).map(([company, data]) => ({
     company: company.toUpperCase() + ' Kargo',
     active: data.activeShipments || 0,
     delivered: data.deliveredShipments || 0,
     pending: data.pendingShipments || 0,
     status: data.success ? 'active' : 'warning'
-  })) : cargoStatus
+  })) : fallbackCargoStatus
 
   return (
     <Box className="fade-in">
       {/* Header */}
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="h4" sx={{ fontWeight: 700 }}>
           Dashboard
         </Typography>
+          <IconButton onClick={refetchAll} color="primary">
+            <RefreshIcon />
+          </IconButton>
+        </Box>
         <Typography variant="body1" color="text.secondary">
           E-ticaret entegrasyon sisteminizin genel durumu
         </Typography>
@@ -310,7 +312,7 @@ function Dashboard() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                   Haftalık Satış Trendi
                 </Typography>
-                <IconButton size="small">
+                <IconButton size="small" onClick={refetchAll}>
                   <RefreshIcon />
                 </IconButton>
               </Box>
@@ -483,6 +485,18 @@ function Dashboard() {
           </Card>
         </Grid>
       </Grid>
+
+      {/* API Status Notice */}
+      {(!stats?.success || !recentOrders?.success || !salesTrends?.success || !marketplacePerformance?.success) && (
+        <Box sx={{ mt: 3 }}>
+          <Alert severity="warning" sx={{ borderRadius: 2 }}>
+            <Typography variant="body2">
+              <strong>Veri Durumu:</strong> Bazı veriler veritabanından alınamadı, örnek veriler gösteriliyor. 
+              Gerçek veriler için veritabanında sipariş ve ürün verilerinin bulunması gerekir.
+            </Typography>
+          </Alert>
+        </Box>
+      )}
     </Box>
   )
 }
