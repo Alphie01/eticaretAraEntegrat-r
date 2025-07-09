@@ -1,6 +1,10 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
 const { encrypt, decrypt } = require('../utils/encryption');
+const { SUPPORTED_MARKETPLACES } = require('../constants/marketplaces');
+
+// Debug logging to check constants
+console.log('UserMarketplaceKeys - SUPPORTED_MARKETPLACES:', SUPPORTED_MARKETPLACES);
 
 class UserMarketplaceKeys extends Model {
   // Safe decryption method that handles both encrypted and non-encrypted data
@@ -154,7 +158,17 @@ const initUserMarketplaceKeys = () => {
       type: DataTypes.STRING(50),
       allowNull: false,
       validate: {
-        isIn: [['trendyol', 'hepsiburada', 'amazon', 'n11', 'gittigidiyor']]
+        isIn: {
+          args: [SUPPORTED_MARKETPLACES],
+          msg: `Marketplace must be one of: ${SUPPORTED_MARKETPLACES.join(', ')}`
+        },
+        customValidator(value) {
+          console.log('UserMarketplaceKeys validation - marketplace value:', value);
+          console.log('UserMarketplaceKeys validation - allowed values:', SUPPORTED_MARKETPLACES);
+          if (!SUPPORTED_MARKETPLACES.includes(value)) {
+            throw new Error(`Invalid marketplace: ${value}. Allowed: ${SUPPORTED_MARKETPLACES.join(', ')}`);
+          }
+        }
       }
     },
     encrypted_api_key: {

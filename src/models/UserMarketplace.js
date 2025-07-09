@@ -1,19 +1,14 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
-const { encrypt, decrypt } = require('../utils/encryption');
+const { encrypt, decrypt, safeDecrypt, isEncrypted } = require('../utils/encryption');
 
 class UserMarketplace extends Model {
   // Safe decryption method that handles both encrypted and non-encrypted data
   safeDecrypt(value) {
     if (!value) return null;
     
-    // If the value doesn't contain ':' it's likely not encrypted
-    if (!value.includes(':')) {
-      return value; // Return as plain text
-    }
-    
     try {
-      return decrypt(value);
+      return safeDecrypt(value);
     } catch (error) {
       console.warn(`Failed to decrypt value, returning as plain text: ${error.message}`);
       return value; // Return as plain text if decryption fails

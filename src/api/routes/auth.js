@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const passport = require('../../config/passport'); // Import passport config
 const { protect, authorize } = require('../../middleware/auth');
 const logger = require('../../utils/logger');
+const { SUPPORTED_MARKETPLACES } = require('../../constants/marketplaces');
 
 // Import models properly
 const { User } = require('../../models');
@@ -471,8 +472,7 @@ router.post('/marketplace', protect, async (req, res) => {
     const { marketplace, credentials, settings } = req.body;
 
     // Validate marketplace
-    const validMarketplaces = ['trendyol', 'hepsiburada', 'amazon', 'n11'];
-    if (!validMarketplaces.includes(marketplace)) {
+    if (!SUPPORTED_MARKETPLACES.includes(marketplace)) {
       return res.status(400).json({
         success: false,
         error: 'Invalid marketplace'

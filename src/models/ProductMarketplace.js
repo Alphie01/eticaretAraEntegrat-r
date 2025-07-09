@@ -1,5 +1,6 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
+const { SUPPORTED_MARKETPLACES } = require('../constants/marketplaces');
 
 class ProductMarketplace extends Model {}
 
@@ -25,7 +26,7 @@ const initProductMarketplace = () => {
       type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        isIn: [['trendyol', 'hepsiburada', 'amazon', 'n11']]
+        isIn: [SUPPORTED_MARKETPLACES]
       }
     },
     marketplace_product_id: {

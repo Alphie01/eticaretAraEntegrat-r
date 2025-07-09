@@ -13,6 +13,8 @@
     "docker:run": "docker-compose up",
     "db:seed": "node src/scripts/seed.js",
     "db:oauth-migration": "node scripts/add_oauth_migration.js",
+    "db:encrypt-keys": "node scripts/encrypt_api_keys.js --migrate",
+    "db:test-encryption": "node scripts/encrypt_api_keys.js --test",
     "jobs:worker": "node src/jobs/worker.js"
   },
   "keywords": [

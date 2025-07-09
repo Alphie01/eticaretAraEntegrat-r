@@ -1,5 +1,6 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
+const { SUPPORTED_MARKETPLACES } = require('../constants/marketplaces');
 
 class SyncLog extends Model {
   // Check if sync was successful
@@ -61,7 +62,7 @@ const initSyncLog = () => {
       type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        isIn: [['trendyol', 'hepsiburada', 'amazon', 'n11']]
+        isIn: [SUPPORTED_MARKETPLACES]
       }
     },
     entity: {

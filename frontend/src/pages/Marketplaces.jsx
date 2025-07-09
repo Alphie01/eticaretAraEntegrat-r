@@ -48,148 +48,7 @@ import {
   useTestMarketplaceConnection,
   useUpdateMarketplaceSettings,
 } from "../hooks/useMarketplaces";
-import toast from "react-hot-toast";
-
-const supportedMarketplaces = [
-  {
-    id: "trendyol",
-    name: "Trendyol",
-    logo: "🛒",
-    color: "#f27a1a",
-    description: "Türkiye'nin en büyük e-ticaret platformu",
-    credentials: [
-      { key: "apiKey", label: "API Key", type: "text", required: true },
-      {
-        key: "apiSecret",
-        label: "API Secret",
-        type: "password",
-        required: true,
-      },
-      { key: "supplierId", label: "Supplier ID", type: "text", required: true },
-    ],
-  },
-  {
-    id: "hepsiburada",
-    name: "Hepsiburada",
-    logo: "🏪",
-    color: "#ff6000",
-    description: "Teknoloji ve genel ürün kategorileri",
-    credentials: [
-      { key: "username", label: "Username", type: "text", required: true },
-      { key: "password", label: "Password", type: "password", required: true },
-      {
-        key: "merchantId",
-        label: "Merchant ID",
-        type: "text",
-        required: false,
-      },
-    ],
-  },
-  {
-    id: "amazon",
-    name: "Amazon",
-    logo: "📦",
-    color: "#ff9900",
-    description: "Uluslararası e-ticaret platformu",
-    credentials: [
-      {
-        key: "accessKeyId",
-        label: "Access Key ID",
-        type: "text",
-        required: true,
-      },
-      {
-        key: "secretAccessKey",
-        label: "Secret Access Key",
-        type: "password",
-        required: true,
-      },
-      {
-        key: "merchantId",
-        label: "Merchant ID",
-        type: "text",
-        required: false,
-      },
-    ],
-  },
-  {
-    id: "n11",
-    name: "N11",
-    logo: "🛍️",
-    color: "#f5a623",
-    description: "Çok kategorili alışveriş sitesi",
-    credentials: [
-      { key: "apiKey", label: "API Key", type: "text", required: true },
-      {
-        key: "apiSecret",
-        label: "API Secret",
-        type: "password",
-        required: true,
-      },
-    ],
-  },
-  {
-    id: "shopify",
-    name: "Shopify",
-    logo: "🏬",
-    color: "#95bf47",
-    description: "Kendi mağazanız için e-ticaret platform",
-    credentials: [
-      { key: "shopDomain", label: "Shop Domain", type: "text", required: true },
-      {
-        key: "accessToken",
-        label: "Access Token",
-        type: "password",
-        required: true,
-      },
-    ],
-  },
-  {
-    id: "ciceksepeti",
-    name: "ÇiçekSepeti",
-    logo: "🌸",
-    color: "#e91e63",
-    description: "Çiçek ve hediye platformu",
-    credentials: [
-      { key: "apiKey", label: "API Key", type: "text", required: true },
-      { key: "sellerId", label: "Seller ID", type: "text", required: false },
-    ],
-  },
-  {
-    id: "pazarama",
-    name: "Pazarama",
-    logo: "🛒",
-    color: "#2196f3",
-    description: "Pazaryeri platformu",
-    credentials: [
-      { key: "apiKey", label: "API Key", type: "text", required: true },
-      {
-        key: "apiSecret",
-        label: "API Secret",
-        type: "password",
-        required: true,
-      },
-      { key: "sellerId", label: "Seller ID", type: "text", required: false },
-    ],
-  },
-  {
-    id: "pttavm",
-    name: "PTT AVM",
-    logo: "📮",
-    color: "#ffeb3b",
-    description: "PTT'nin e-ticaret platformu",
-    credentials: [
-      { key: "apiKey", label: "API Key", type: "text", required: true },
-      {
-        key: "apiSecret",
-        label: "API Secret",
-        type: "password",
-        required: true,
-      },
-      { key: "sellerId", label: "Seller ID", type: "text", required: false },
-    ],
-  },
-];
+import { supportedMarketplaces } from "../constants/marketplaces";
 
 function MarketplaceCard({ marketplace, onEdit, onTest, onSync }) {
   const [syncEnabled, setSyncEnabled] = useState(
@@ -212,6 +71,7 @@ function MarketplaceCard({ marketplace, onEdit, onTest, onSync }) {
   };
 
   const getStatusText = () => {
+   
     console.log(marketplace);
     switch (marketplace.status) {
       case "connected":
@@ -590,11 +450,11 @@ function Marketplaces() {
 
     // Safety check - if no credentials found, assume none exist
     if (!userCredentials) {
-      console.log(`No credentials found for ${supported.id}`);
+      /* console.log(`No credentials found for ${supported.id}`); */
     }
 
-    console.log("Marketplace data:", marketplacesData?.data);
-    console.log("User credentials for", supported.id, ":", userCredentials);
+    /*     console.log("Marketplace data:", marketplacesData?.data);
+    console.log("User credentials for", supported.id, ":", userCredentials); */
 
     return {
       ...supported,
@@ -805,6 +665,7 @@ function Marketplaces() {
         <Typography variant="body1" color="text.secondary">
           E-ticaret platformlarınızı yönetin ve kimlik bilgilerinizi
           yapılandırın
+          {localStorage.getItem("token")}
         </Typography>
       </Box>
 

@@ -5,6 +5,7 @@ const { UserMarketplaceAccount } = require("../../models/UserMarketplaceAccount"
 const { protect } = require("../../middleware/auth");
 const { validateApiKey } = require("../../utils/validation");
 const logger = require("../../utils/logger");
+const { SUPPORTED_MARKETPLACES } = require("../../constants/marketplaces");
 
 const router = express.Router();
 
@@ -88,60 +89,11 @@ router.get("/", protect, async (req, res) => {
 // @access  Private
 router.get("/supported", protect, async (req, res) => {
   try {
-    const supportedMarketplaces = [
-      {
-        name: "trendyol",
-        display_name: "Trendyol",
-        required_fields: ["api_key", "api_secret", "supplier_id"],
-        documentation_url: "https://developers.trendyol.com/",
-      },
-      {
-        name: "hepsiburada",
-        display_name: "Hepsiburada",
-        required_fields: ["api_key"],
-        documentation_url: "https://developer.hepsiburada.com/",
-      },
-      {
-        name: "amazon",
-        display_name: "Amazon",
-        required_fields: ["api_key", "api_secret"],
-        documentation_url: "https://developer.amazonservices.com/",
-      },
-      {
-        name: "n11",
-        display_name: "N11",
-        required_fields: ["api_key", "api_secret"],
-        documentation_url: "https://www.n11.com/api/",
-      },
-      {
-        name: "shopify",
-        display_name: "Shopify",
-        required_fields: ["shop_domain", "api_secret"],
-        documentation_url: "https://shopify.dev/",
-      },
-      {
-        name: "ciceksepeti",
-        display_name: "ÇiçekSepeti",
-        required_fields: ["api_key", "seller_id"],
-        documentation_url: "https://developers.ciceksepeti.com/",
-      },
-      {
-        name: "pazarama",
-        display_name: "Pazarama",
-        required_fields: ["api_key", "api_secret", "seller_id"],
-        documentation_url: "https://pazarama.com/",
-      },
-      {
-        name: "pttavm",
-        display_name: "PTT AVM",
-        required_fields: ["api_key", "api_secret", "seller_id"],
-        documentation_url: "https://pttavm.com/",
-      },
-    ];
+    const supportedMarketplacesInfo = getSupportedMarketplacesInfo();
 
     res.status(200).json({
       success: true,
-      data: supportedMarketplaces,
+      data: supportedMarketplacesInfo,
     });
   } catch (error) {
     logger.error("Get supported marketplaces failed:", error);

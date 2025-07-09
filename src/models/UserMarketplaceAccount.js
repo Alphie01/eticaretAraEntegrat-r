@@ -1,5 +1,9 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
+const { SUPPORTED_MARKETPLACES } = require('../constants/marketplaces');
+
+// Debug logging to check constants
+console.log('UserMarketplaceAccount - SUPPORTED_MARKETPLACES:', SUPPORTED_MARKETPLACES);
 
 class UserMarketplaceAccount extends Model {}
 
@@ -25,7 +29,17 @@ const initUserMarketplaceAccount = () => {
       type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        isIn: [['trendyol', 'hepsiburada', 'amazon', 'n11']]
+        isIn: {
+          args: [SUPPORTED_MARKETPLACES],
+          msg: `Marketplace must be one of: ${SUPPORTED_MARKETPLACES.join(', ')}`
+        },
+        customValidator(value) {
+          console.log('UserMarketplaceAccount validation - marketplace value:', value);
+          console.log('UserMarketplaceAccount validation - allowed values:', SUPPORTED_MARKETPLACES);
+          if (!SUPPORTED_MARKETPLACES.includes(value)) {
+            throw new Error(`Invalid marketplace: ${value}. Allowed: ${SUPPORTED_MARKETPLACES.join(', ')}`);
+          }
+        }
       }
     },
     is_active: {

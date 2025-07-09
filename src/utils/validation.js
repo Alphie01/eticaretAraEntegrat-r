@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const { SUPPORTED_MARKETPLACES, ORDER_MARKETPLACES } = require('../constants/marketplaces');
 
 // User validation schemas
 const userSchemas = {
@@ -46,7 +47,7 @@ const userSchemas = {
   }),
 
   addMarketplace: Joi.object({
-    marketplace: Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11').required(),
+    marketplace: Joi.string().valid(...SUPPORTED_MARKETPLACES).required(),
     credentials: Joi.object().required(),
     settings: Joi.object({
       syncProducts: Joi.boolean(),
@@ -115,7 +116,7 @@ const productSchemas = {
     ),
     marketplaceSettings: Joi.array().items(
       Joi.object({
-        marketplace: Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11').required(),
+        marketplace: Joi.string().valid(...SUPPORTED_MARKETPLACES).required(),
         isActive: Joi.boolean().default(true),
         autoSync: Joi.boolean().default(true),
         priceMultiplier: Joi.number().min(0.1).max(10).default(1),
@@ -184,7 +185,7 @@ const productSchemas = {
     ),
     marketplaceSettings: Joi.array().items(
       Joi.object({
-        marketplace: Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11').required(),
+        marketplace: Joi.string().valid(...SUPPORTED_MARKETPLACES).required(),
         isActive: Joi.boolean(),
         autoSync: Joi.boolean(),
         priceMultiplier: Joi.number().min(0.1).max(10),
@@ -221,7 +222,7 @@ const productSchemas = {
 
   sync: Joi.object({
     marketplaces: Joi.array().items(
-      Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11')
+      Joi.string().valid(...SUPPORTED_MARKETPLACES)
     )
   }),
 
@@ -236,7 +237,7 @@ const productSchemas = {
 const orderSchemas = {
   create: Joi.object({
     marketplace: Joi.object({
-      name: Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11', 'website').required(),
+      name: Joi.string().valid(...ORDER_MARKETPLACES).required(),
       orderId: Joi.string().required(),
       orderNumber: Joi.string(),
       orderDate: Joi.date()
@@ -300,7 +301,7 @@ const orderSchemas = {
 
   import: Joi.object({
     marketplaces: Joi.array().items(
-      Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11')
+      Joi.string().valid(...SUPPORTED_MARKETPLACES)
     ),
     startDate: Joi.date(),
     endDate: Joi.date()
@@ -312,13 +313,13 @@ const syncSchemas = {
   products: Joi.object({
     productIds: Joi.array().items(Joi.string()),
     marketplaces: Joi.array().items(
-      Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11')
+      Joi.string().valid(...SUPPORTED_MARKETPLACES)
     )
   }),
 
   orders: Joi.object({
     marketplaces: Joi.array().items(
-      Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11')
+      Joi.string().valid(...SUPPORTED_MARKETPLACES)
     ),
     startDate: Joi.date(),
     endDate: Joi.date()
@@ -330,7 +331,7 @@ const reportSchemas = {
   salesReport: Joi.object({
     startDate: Joi.date(),
     endDate: Joi.date(),
-    marketplace: Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11'),
+    marketplace: Joi.string().valid(...SUPPORTED_MARKETPLACES),
     groupBy: Joi.string().valid('hour', 'day', 'month', 'year').default('day')
   }),
 
@@ -354,7 +355,7 @@ const marketplaceSchemas = {
   bulkOperation: Joi.object({
     operation: Joi.string().required(),
     marketplaces: Joi.array().items(
-      Joi.string().valid('trendyol', 'hepsiburada', 'amazon', 'n11')
+      Joi.string().valid(...SUPPORTED_MARKETPLACES)
     ).required(),
     data: Joi.object()
   }),

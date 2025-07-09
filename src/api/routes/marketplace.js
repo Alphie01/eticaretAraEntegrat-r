@@ -1,8 +1,15 @@
-const express = require('express');
-const { protect } = require('../../middleware/auth');
-const UserAdapterManager = require('../../core/UserAdapterManager');
-const { UserMarketplaceKeys } = require('../../models/UserMarketplaceKeys');
-const logger = require('../../utils/logger');
+const express = require("express");
+const { protect } = require("../../middleware/auth");
+const UserAdapterManager = require("../../core/UserAdapterManager");
+const { UserMarketplaceKeys } = require("../../models/UserMarketplaceKeys");
+const logger = require("../../utils/logger");
+const {
+  SUPPORTED_MARKETPLACES,
+  getMarketplaceDisplayName,
+  getMarketplaceColor,
+  getMarketplaceLogo,
+  getMarketplaceDescription,
+} = require("../../constants/marketplaces");
 
 const router = express.Router();
 
@@ -22,24 +29,27 @@ async function getUserAdapterManager(userId) {
 // @desc    Get user's marketplace configurations
 // @route   GET /api/v1/marketplace
 // @access  Private
-router.get('/', protect, async (req, res) => {
+router.get("/", protect, async (req, res) => {
   try {
     const manager = await getUserAdapterManager(req.user.id);
     const activeMarketplaces = manager.getActiveMarketplaces();
-    
+
     // Get user's marketplace keys for status info
     const userKeys = await UserMarketplaceKeys.findAll({
       where: { user_id: req.user.id },
-      order: [['marketplace', 'ASC'], ['created_at', 'DESC']]
+      order: [
+        ["marketplace", "ASC"],
+        ["created_at", "DESC"],
+      ],
     });
 
-    const marketplaceConfigs = userKeys.map(key => ({
+    const marketplaceConfigs = userKeys.map((key) => ({
       marketplace: key.marketplace,
       isActive: key.is_active,
       isConnected: activeMarketplaces.includes(key.marketplace),
       keyName: key.key_name,
       lastUsed: key.last_used_at,
-      createdAt: key.created_at
+      createdAt: key.created_at,
     }));
 
     res.status(200).json({
@@ -48,16 +58,17 @@ router.get('/', protect, async (req, res) => {
         activeMarketplaces,
         configurations: marketplaceConfigs,
         totalActive: activeMarketplaces.length,
-        message: activeMarketplaces.length === 0 
-          ? 'No marketplace integrations configured. Please add your API credentials.'
-          : `${activeMarketplaces.length} marketplace integration(s) active: ${activeMarketplaces.join(', ')}`
-      }
+        message:
+          activeMarketplaces.length === 0
+            ? "No marketplace integrations configured. Please add your API credentials."
+            : `${activeMarketplaces.length} marketplace integration(s) active: ${activeMarketplaces.join(", ")}`,
+      },
     });
   } catch (error) {
-    logger.error('Get user marketplaces failed:', error);
+    logger.error("Get user marketplaces failed:", error);
     res.status(500).json({
       success: false,
-      error: 'Server error while fetching marketplace configurations'
+      error: "Server error while fetching marketplace configurations",
     });
   }
 });
@@ -65,24 +76,31 @@ router.get('/', protect, async (req, res) => {
 // @desc    Add marketplace credentials
 // @route   POST /api/v1/marketplace/:marketplace
 // @access  Private
-router.post('/:marketplace', protect, async (req, res) => {
+router.post("/:marketplace", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const credentials = req.body;
 
+    console.log(req.user.id);
+    console.log(credentials);
+    console.log(marketplace);
+    console.log("--------");
     const manager = await getUserAdapterManager(req.user.id);
+    console.log(manager);
     await manager.addMarketplace(marketplace, credentials);
+    console.log("--------");
+    console.log(manager);
 
     logger.info(`Marketplace added: ${marketplace} for user ${req.user.email}`);
     res.status(201).json({
       success: true,
-      message: `${marketplace} marketplace credentials added successfully`
+      message: `${marketplace} marketplace credentials added successfully`,
     });
   } catch (error) {
-    logger.error('Add marketplace failed:', error);
+    logger.error("Add marketplace failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while adding marketplace'
+      error: error.message || "Server error while adding marketplace",
     });
   }
 });
@@ -90,24 +108,30 @@ router.post('/:marketplace', protect, async (req, res) => {
 // @desc    Update marketplace credentials
 // @route   PUT /api/v1/marketplace/:marketplace
 // @access  Private
-router.put('/:marketplace', protect, async (req, res) => {
+router.put("/:marketplace", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const credentials = req.body;
 
+    console.log(req.user.id);
+    console.log(credentials);
+    console.log(marketplace);
+    console.log("--------");
     const manager = await getUserAdapterManager(req.user.id);
     await manager.updateMarketplace(marketplace, credentials);
 
-    logger.info(`Marketplace updated: ${marketplace} for user ${req.user.email}`);
+    logger.info(
+      `Marketplace updated: ${marketplace} for user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      message: `${marketplace} marketplace credentials updated successfully`
+      message: `${marketplace} marketplace credentials updated successfully`,
     });
   } catch (error) {
-    logger.error('Update marketplace failed:', error);
+    logger.error("Update marketplace failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while updating marketplace'
+      error: error.message || "Server error while updating marketplace",
     });
   }
 });
@@ -115,41 +139,43 @@ router.put('/:marketplace', protect, async (req, res) => {
 // @desc    Test marketplace connection
 // @route   GET /api/v1/marketplace/:marketplace/test
 // @access  Private
-router.get('/:marketplace/test', protect, async (req, res) => {
+router.get("/:marketplace/test", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
-    
+
     const manager = await getUserAdapterManager(req.user.id);
-    
+
     if (!manager.hasMarketplace(marketplace)) {
       return res.status(404).json({
         success: false,
-        error: `No configuration found for ${marketplace}. Please add your credentials first.`
+        error: `No configuration found for ${marketplace}. Please add your credentials first.`,
       });
     }
 
     const adapter = manager.getAdapter(marketplace);
-    
+
     // Test with a simple API call
     await adapter.getProducts({ page: 0, size: 1 });
-    
+
     const result = {
       success: true,
       marketplace,
       message: `${marketplace} connection test successful`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    logger.info(`Marketplace connection test: ${marketplace} - SUCCESS by user ${req.user.email}`);
+    logger.info(
+      `Marketplace connection test: ${marketplace} - SUCCESS by user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Test marketplace connection failed:', error);
+    logger.error("Test marketplace connection failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error during connection test'
+      error: error.message || "Server error during connection test",
     });
   }
 });
@@ -157,41 +183,43 @@ router.get('/:marketplace/test', protect, async (req, res) => {
 // @desc    Test marketplace connection (POST version)
 // @route   POST /api/v1/marketplace/:marketplace/test
 // @access  Private
-router.post('/:marketplace/test', protect, async (req, res) => {
+router.post("/:marketplace/test", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
-    
+
     const manager = await getUserAdapterManager(req.user.id);
-    
+
     if (!manager.hasMarketplace(marketplace)) {
       return res.status(404).json({
         success: false,
-        error: `No configuration found for ${marketplace}. Please add your credentials first.`
+        error: `No configuration found for ${marketplace}. Please add your credentials first.`,
       });
     }
 
     const adapter = manager.getAdapter(marketplace);
-    
+
     // Test with a simple API call
     await adapter.getProducts({ page: 0, size: 1 });
-    
+
     const result = {
       success: true,
       marketplace,
       message: `${marketplace} connection test successful`,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    logger.info(`Marketplace connection test: ${marketplace} - SUCCESS by user ${req.user.email}`);
+    logger.info(
+      `Marketplace connection test: ${marketplace} - SUCCESS by user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Test marketplace connection failed:', error);
+    logger.error("Test marketplace connection failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error during connection test'
+      error: error.message || "Server error during connection test",
     });
   }
 });
@@ -199,29 +227,30 @@ router.post('/:marketplace/test', protect, async (req, res) => {
 // @desc    Get marketplace products
 // @route   GET /api/v1/marketplace/:marketplace/products
 // @access  Private
-router.get('/:marketplace/products', protect, async (req, res) => {
+router.get("/:marketplace/products", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const { page = 0, limit = 50, ...otherParams } = req.query;
 
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
-    
+
     const result = await adapter.getProducts({
       page: parseInt(page),
       size: parseInt(limit),
-      ...otherParams
+      ...otherParams,
     });
 
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Get marketplace products failed:', error);
+    logger.error("Get marketplace products failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while fetching marketplace products'
+      error:
+        error.message || "Server error while fetching marketplace products",
     });
   }
 });
@@ -229,29 +258,29 @@ router.get('/:marketplace/products', protect, async (req, res) => {
 // @desc    Get marketplace orders
 // @route   GET /api/v1/marketplace/:marketplace/orders
 // @access  Private
-router.get('/:marketplace/orders', protect, async (req, res) => {
+router.get("/:marketplace/orders", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const { page = 0, limit = 50, ...otherParams } = req.query;
 
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
-    
+
     const result = await adapter.getOrders({
       page: parseInt(page),
       size: parseInt(limit),
-      ...otherParams
+      ...otherParams,
     });
 
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Get marketplace orders failed:', error);
+    logger.error("Get marketplace orders failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while fetching marketplace orders'
+      error: error.message || "Server error while fetching marketplace orders",
     });
   }
 });
@@ -259,24 +288,25 @@ router.get('/:marketplace/orders', protect, async (req, res) => {
 // @desc    Get marketplace categories
 // @route   GET /api/v1/marketplace/:marketplace/categories
 // @access  Private
-router.get('/:marketplace/categories', protect, async (req, res) => {
+router.get("/:marketplace/categories", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
 
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
-    
+
     const categories = await adapter.getCategories();
 
     res.status(200).json({
       success: true,
-      data: categories
+      data: categories,
     });
   } catch (error) {
-    logger.error('Get marketplace categories failed:', error);
+    logger.error("Get marketplace categories failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while fetching marketplace categories'
+      error:
+        error.message || "Server error while fetching marketplace categories",
     });
   }
 });
@@ -284,26 +314,26 @@ router.get('/:marketplace/categories', protect, async (req, res) => {
 // @desc    Create product in marketplace
 // @route   POST /api/v1/marketplace/:marketplace/products
 // @access  Private
-router.post('/:marketplace/products', protect, async (req, res) => {
+router.post("/:marketplace/products", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const productData = req.body;
 
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
-    
+
     const result = await adapter.createProduct(productData);
 
     logger.info(`Product created in ${marketplace} by user ${req.user.email}`);
     res.status(201).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Create marketplace product failed:', error);
+    logger.error("Create marketplace product failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while creating marketplace product'
+      error: error.message || "Server error while creating marketplace product",
     });
   }
 });
@@ -311,26 +341,28 @@ router.post('/:marketplace/products', protect, async (req, res) => {
 // @desc    Update product in marketplace
 // @route   PUT /api/v1/marketplace/:marketplace/products/:productId
 // @access  Private
-router.put('/:marketplace/products/:productId', protect, async (req, res) => {
+router.put("/:marketplace/products/:productId", protect, async (req, res) => {
   try {
     const { marketplace, productId } = req.params;
     const productData = req.body;
 
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
-    
+
     const result = await adapter.updateProduct(productId, productData);
 
-    logger.info(`Product ${productId} updated in ${marketplace} by user ${req.user.email}`);
+    logger.info(
+      `Product ${productId} updated in ${marketplace} by user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      data: result
+      data: result,
     });
   } catch (error) {
-    logger.error('Update marketplace product failed:', error);
+    logger.error("Update marketplace product failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while updating marketplace product'
+      error: error.message || "Server error while updating marketplace product",
     });
   }
 });
@@ -338,117 +370,156 @@ router.put('/:marketplace/products/:productId', protect, async (req, res) => {
 // @desc    Update stock in marketplace
 // @route   PUT /api/v1/marketplace/:marketplace/products/:productId/stock
 // @access  Private
-router.put('/:marketplace/products/:productId/stock', protect, async (req, res) => {
-  try {
-    const { marketplace, productId } = req.params;
-    const { stock, variantId } = req.body;
+router.put(
+  "/:marketplace/products/:productId/stock",
+  protect,
+  async (req, res) => {
+    try {
+      const { marketplace, productId } = req.params;
+      const { stock, variantId } = req.body;
 
-    const manager = await getUserAdapterManager(req.user.id);
-    const adapter = manager.getAdapter(marketplace);
-    
-    const result = await adapter.updateStock(productId, stock, variantId);
+      const manager = await getUserAdapterManager(req.user.id);
+      const adapter = manager.getAdapter(marketplace);
 
-    logger.info(`Stock updated for product ${productId} in ${marketplace} by user ${req.user.email}`);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    logger.error('Update marketplace stock failed:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Server error while updating marketplace stock'
-    });
+      const result = await adapter.updateStock(productId, stock, variantId);
+
+      logger.info(
+        `Stock updated for product ${productId} in ${marketplace} by user ${req.user.email}`
+      );
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Update marketplace stock failed:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Server error while updating marketplace stock",
+      });
+    }
   }
-});
+);
 
 // @desc    Update price in marketplace
 // @route   PUT /api/v1/marketplace/:marketplace/products/:productId/price
 // @access  Private
-router.put('/:marketplace/products/:productId/price', protect, async (req, res) => {
-  try {
-    const { marketplace, productId } = req.params;
-    const { price, variantId } = req.body;
+router.put(
+  "/:marketplace/products/:productId/price",
+  protect,
+  async (req, res) => {
+    try {
+      const { marketplace, productId } = req.params;
+      const { price, variantId } = req.body;
 
-    const manager = await getUserAdapterManager(req.user.id);
-    const adapter = manager.getAdapter(marketplace);
-    
-    const result = await adapter.updatePrice(productId, price, variantId);
+      const manager = await getUserAdapterManager(req.user.id);
+      const adapter = manager.getAdapter(marketplace);
 
-    logger.info(`Price updated for product ${productId} in ${marketplace} by user ${req.user.email}`);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    logger.error('Update marketplace price failed:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Server error while updating marketplace price'
-    });
+      const result = await adapter.updatePrice(productId, price, variantId);
+
+      logger.info(
+        `Price updated for product ${productId} in ${marketplace} by user ${req.user.email}`
+      );
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Update marketplace price failed:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Server error while updating marketplace price",
+      });
+    }
   }
-});
+);
 
 // @desc    Update order status in marketplace
 // @route   PUT /api/v1/marketplace/:marketplace/orders/:orderId/status
 // @access  Private
-router.put('/:marketplace/orders/:orderId/status', protect, async (req, res) => {
-  try {
-    const { marketplace, orderId } = req.params;
-    const { status, trackingInfo } = req.body;
+router.put(
+  "/:marketplace/orders/:orderId/status",
+  protect,
+  async (req, res) => {
+    try {
+      const { marketplace, orderId } = req.params;
+      const { status, trackingInfo } = req.body;
 
-    const manager = await getUserAdapterManager(req.user.id);
-    const adapter = manager.getAdapter(marketplace);
-    
-    const result = await adapter.updateOrderStatus(orderId, status, trackingInfo);
+      const manager = await getUserAdapterManager(req.user.id);
+      const adapter = manager.getAdapter(marketplace);
 
-    logger.info(`Order ${orderId} status updated in ${marketplace} by user ${req.user.email}`);
-    res.status(200).json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    logger.error('Update marketplace order status failed:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message || 'Server error while updating marketplace order status'
-    });
+      const result = await adapter.updateOrderStatus(
+        orderId,
+        status,
+        trackingInfo
+      );
+
+      logger.info(
+        `Order ${orderId} status updated in ${marketplace} by user ${req.user.email}`
+      );
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      logger.error("Update marketplace order status failed:", error);
+      res.status(500).json({
+        success: false,
+        error:
+          error.message ||
+          "Server error while updating marketplace order status",
+      });
+    }
   }
-});
+);
 
 // @desc    Get marketplace status summary
 // @route   GET /api/v1/marketplace/status
 // @access  Private
-router.get('/status', protect, async (req, res) => {
+router.get("/status", protect, async (req, res) => {
   try {
     const manager = await getUserAdapterManager(req.user.id);
     const activeMarketplaces = manager.getActiveMarketplaces();
-    
+
     // Get user's marketplace keys
     const userKeys = await UserMarketplaceKeys.findAll({
-      where: { user_id: req.user.id }
+      where: { user_id: req.user.id },
     });
 
     // All available marketplaces
-    const allMarketplaces = ['trendyol', 'hepsiburada', 'amazon', 'n11', 'shopify', 'ciceksepeti', 'pazarama', 'pttavm'];
+    const allMarketplaces = [
+      "trendyol",
+      "hepsiburada",
+      "amazon",
+      "n11",
+      "shopify",
+      "ciceksepeti",
+      "pazarama",
+      "pttavm",
+    ];
 
     // Build marketplace data with user's actual status
-    const marketplaceData = allMarketplaces.map(marketplace => {
-      const userKey = userKeys.find(key => key.marketplace === marketplace);
+    const marketplaceData = allMarketplaces.map((marketplace) => {
+      const userKey = userKeys.find((key) => key.marketplace === marketplace);
       const isActive = activeMarketplaces.includes(marketplace);
-      
+
       return {
         id: marketplace,
-        name: getMarketplaceName(marketplace),
+        name: getMarketplaceDisplayName(marketplace),
         logo: getMarketplaceLogo(marketplace),
-        status: isActive ? 'connected' : (userKey && userKey.is_active ? 'warning' : 'error'),
+        status: isActive
+          ? "connected"
+          : userKey && userKey.is_active
+            ? "warning"
+            : "error",
         orders: isActive ? Math.floor(Math.random() * 500) + 100 : 0, // Mock data for demo
         products: isActive ? Math.floor(Math.random() * 1000) + 200 : 0,
-        revenue: isActive ? `₺${(Math.floor(Math.random() * 50000) + 5000).toLocaleString()}` : '₺0',
+        revenue: isActive
+          ? `₺${(Math.floor(Math.random() * 50000) + 5000).toLocaleString()}`
+          : "₺0",
         color: getMarketplaceColor(marketplace),
         description: getMarketplaceDescription(marketplace),
         hasCredentials: !!userKey,
-        lastUsed: userKey?.last_used_at
+        lastUsed: userKey?.last_used_at,
       };
     });
 
@@ -459,18 +530,19 @@ router.get('/status', protect, async (req, res) => {
         summary: {
           activeCount: activeMarketplaces.length,
           totalConfigured: userKeys.length,
-          activeMarketplaces
+          activeMarketplaces,
         },
-        message: activeMarketplaces.length === 0 
-          ? 'No marketplace integrations are active. Please configure your API credentials.'
-          : `${activeMarketplaces.length} marketplace integration(s) active: ${activeMarketplaces.join(', ')}`
-      }
+        message:
+          activeMarketplaces.length === 0
+            ? "No marketplace integrations are active. Please configure your API credentials."
+            : `${activeMarketplaces.length} marketplace integration(s) active: ${activeMarketplaces.join(", ")}`,
+      },
     });
   } catch (error) {
-    logger.error('Get marketplace status failed:', error);
+    logger.error("Get marketplace status failed:", error);
     res.status(500).json({
       success: false,
-      error: 'Server error while fetching marketplace status'
+      error: "Server error while fetching marketplace status",
     });
   }
 });
@@ -478,30 +550,36 @@ router.get('/status', protect, async (req, res) => {
 // @desc    Get adapter statistics
 // @route   GET /api/v1/marketplace/stats
 // @access  Private
-router.get('/stats', protect, async (req, res) => {
+router.get("/stats", protect, async (req, res) => {
   try {
     const manager = await getUserAdapterManager(req.user.id);
     const activeMarketplaces = manager.getActiveMarketplaces();
-    
+
     // Calculate stats (in production, these would come from actual data)
     const connectedCount = activeMarketplaces.length;
-    const totalOrders = activeMarketplaces.length > 0 ? Math.floor(Math.random() * 2000) + 500 : 0;
-    const totalProducts = activeMarketplaces.length > 0 ? Math.floor(Math.random() * 5000) + 1000 : 0;
-    
+    const totalOrders =
+      activeMarketplaces.length > 0
+        ? Math.floor(Math.random() * 2000) + 500
+        : 0;
+    const totalProducts =
+      activeMarketplaces.length > 0
+        ? Math.floor(Math.random() * 5000) + 1000
+        : 0;
+
     res.status(200).json({
       success: true,
       data: {
         connectedCount,
         totalOrders,
         totalProducts,
-        activeMarketplaces
-      }
+        activeMarketplaces,
+      },
     });
   } catch (error) {
-    logger.error('Get adapter stats failed:', error);
+    logger.error("Get adapter stats failed:", error);
     res.status(500).json({
       success: false,
-      error: 'Server error while fetching adapter statistics'
+      error: "Server error while fetching adapter statistics",
     });
   }
 });
@@ -509,70 +587,75 @@ router.get('/stats', protect, async (req, res) => {
 // @desc    Sync operations across user's marketplaces
 // @route   POST /api/v1/marketplace/sync
 // @access  Private
-router.post('/sync', protect, async (req, res) => {
+router.post("/sync", protect, async (req, res) => {
   try {
     const { operation, marketplaces, data } = req.body;
 
     if (!operation) {
       return res.status(400).json({
         success: false,
-        error: 'Operation is required'
+        error: "Operation is required",
       });
     }
 
     const manager = await getUserAdapterManager(req.user.id);
     const targetMarketplaces = marketplaces || manager.getActiveMarketplaces();
-    
+
     const results = {};
-    
+
     for (const marketplace of targetMarketplaces) {
       if (!manager.hasMarketplace(marketplace)) {
         results[marketplace] = {
           success: false,
-          error: `No configuration found for ${marketplace}`
+          error: `No configuration found for ${marketplace}`,
         };
         continue;
       }
 
       try {
         const adapter = manager.getAdapter(marketplace);
-        
+
         let result;
         switch (operation) {
-          case 'getProducts':
+          case "getProducts":
             result = await adapter.getProducts(data || {});
             break;
-          case 'getOrders':
+          case "getOrders":
             result = await adapter.getOrders(data || {});
             break;
           default:
             throw new Error(`Unknown operation: ${operation}`);
         }
-        
+
         results[marketplace] = {
           success: true,
-          data: result
+          data: result,
         };
       } catch (error) {
-        logger.error(`Sync operation ${operation} failed for ${marketplace}:`, error);
+        logger.error(
+          `Sync operation ${operation} failed for ${marketplace}:`,
+          error
+        );
         results[marketplace] = {
           success: false,
-          error: error.message || 'Unknown error'
+          error: error.message || "Unknown error",
         };
       }
     }
 
-    logger.info(`Sync operation ${operation} executed on ${targetMarketplaces.join(', ')} by user ${req.user.email}`);
+    logger.info(
+      `Sync operation ${operation} executed on ${targetMarketplaces.join(", ")} by user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      message: 'Sync operation completed',
-      results
+      message: "Sync operation completed",
+      results,
     });
   } catch (error) {
-    logger.error('Sync marketplace operation failed:', error);
+    logger.error("Sync marketplace operation failed:", error);
     res.status(500).json({
       success: false,
-      error: 'Server error during sync operation'
+      error: "Server error during sync operation",
     });
   }
 });
@@ -580,7 +663,7 @@ router.post('/sync', protect, async (req, res) => {
 // @desc    Disable marketplace
 // @route   DELETE /api/v1/marketplace/:marketplace
 // @access  Private
-router.delete('/:marketplace', protect, async (req, res) => {
+router.delete("/:marketplace", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
 
@@ -590,75 +673,94 @@ router.delete('/:marketplace', protect, async (req, res) => {
     // Clear the manager from cache to reload it fresh next time
     userAdapterManagers.delete(req.user.id);
 
-    logger.info(`Marketplace disabled: ${marketplace} for user ${req.user.email}`);
+    logger.info(
+      `Marketplace disabled: ${marketplace} for user ${req.user.email}`
+    );
     res.status(200).json({
       success: true,
-      message: `${marketplace} marketplace disabled successfully`
+      message: `${marketplace} marketplace disabled successfully`,
     });
   } catch (error) {
-    logger.error('Disable marketplace failed:', error);
+    logger.error("Disable marketplace failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message || 'Server error while disabling marketplace'
+      error: error.message || "Server error while disabling marketplace",
     });
   }
 });
 
-// Helper functions for marketplace data
-function getMarketplaceName(marketplace) {
-  const names = {
-    'trendyol': 'Trendyol',
-    'hepsiburada': 'Hepsiburada',
-    'amazon': 'Amazon',
-    'n11': 'N11',
-    'shopify': 'Shopify',
-    'ciceksepeti': 'ÇiçekSepeti',
-    'pazarama': 'Pazarama',
-    'pttavm': 'PTT AVM'
-  };
-  return names[marketplace] || marketplace;
-}
+// @desc    Debug endpoint to check database constraints
+// @route   GET /api/v1/marketplace/debug/constraints
+// @access  Public (for testing)
+router.get("/debug/constraints", async (req, res) => {
+  try {
+    const { getSequelize } = require("../../config/database");
+    const sequelize = getSequelize();
 
-function getMarketplaceLogo(marketplace) {
-  const logos = {
-    'trendyol': '🛒',
-    'hepsiburada': '🏪',
-    'amazon': '📦',
-    'n11': '🛍️',
-    'shopify': '🏬',
-    'ciceksepeti': '🌸',
-    'pazarama': '🛒',
-    'pttavm': '📮'
-  };
-  return logos[marketplace] || '🏪';
-}
+    // Query to find all CHECK constraints related to marketplace columns
+    const checkConstraintsQuery = `
+      SELECT 
+        t.table_name,
+        cc.constraint_name,
+        cc.check_clause
+      FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS tc
+      JOIN INFORMATION_SCHEMA.CHECK_CONSTRAINTS cc 
+        ON tc.constraint_name = cc.constraint_name
+      JOIN INFORMATION_SCHEMA.TABLES t 
+        ON tc.table_name = t.table_name
+      WHERE cc.check_clause LIKE '%marketplace%'
+      ORDER BY t.table_name, cc.constraint_name;
+    `;
 
-function getMarketplaceColor(marketplace) {
-  const colors = {
-    'trendyol': '#f27a1a',
-    'hepsiburada': '#ff6000',
-    'amazon': '#ff9900',
-    'n11': '#f5a623',
-    'shopify': '#95bf47',
-    'ciceksepeti': '#e91e63',
-    'pazarama': '#2196f3',
-    'pttavm': '#ffeb3b'
-  };
-  return colors[marketplace] || '#666666';
-}
+    const constraints = await sequelize.query(checkConstraintsQuery, {
+      type: sequelize.QueryTypes.SELECT,
+    });
 
-function getMarketplaceDescription(marketplace) {
-  const descriptions = {
-    'trendyol': 'Türkiye\'nin en büyük e-ticaret platformu',
-    'hepsiburada': 'Teknoloji ve genel ürün kategorileri',
-    'amazon': 'Uluslararası e-ticaret platformu',
-    'n11': 'Çok kategorili alışveriş sitesi',
-    'shopify': 'Kendi mağazanız için e-ticaret platform',
-    'ciceksepeti': 'Çiçek ve hediye platformu',
-    'pazarama': 'Pazaryeri platformu',
-    'pttavm': 'PTT\'nin e-ticaret platformu'
-  };
-  return descriptions[marketplace] || 'E-ticaret platformu';
-}
+    // Check which tables have marketplace columns
+    const tablesWithMarketplaceQuery = `
+      SELECT 
+        TABLE_NAME,
+        COLUMN_NAME,
+        DATA_TYPE,
+        IS_NULLABLE
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE COLUMN_NAME LIKE '%marketplace%'
+      ORDER BY TABLE_NAME, COLUMN_NAME;
+    `;
 
-module.exports = router; 
+    const marketplaceColumns = await sequelize.query(
+      tablesWithMarketplaceQuery,
+      {
+        type: sequelize.QueryTypes.SELECT,
+      }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        supportedMarketplaces: SUPPORTED_MARKETPLACES,
+        constraints,
+        marketplaceColumns,
+        constraintAnalysis: constraints.map((constraint) => ({
+          table: constraint.table_name,
+          constraint: constraint.constraint_name,
+          checkClause: constraint.check_clause,
+          hasAllMarketplaces: SUPPORTED_MARKETPLACES.every((mp) =>
+            constraint.check_clause.includes(`'${mp}'`)
+          ),
+          missingMarketplaces: SUPPORTED_MARKETPLACES.filter(
+            (mp) => !constraint.check_clause.includes(`'${mp}'`)
+          ),
+        })),
+      },
+    });
+  } catch (error) {
+    logger.error("Debug constraints check failed:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+module.exports = router;

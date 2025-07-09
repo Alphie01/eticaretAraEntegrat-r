@@ -1,5 +1,6 @@
 const { DataTypes, Model } = require('sequelize');
 const { getSequelize } = require('../config/database');
+const { ORDER_MARKETPLACES } = require('../constants/marketplaces');
 
 class Order extends Model {
   // Calculate total amount from items
@@ -94,7 +95,7 @@ const initOrder = () => {
       type: DataTypes.STRING(20),
       allowNull: false,
       validate: {
-        isIn: [['trendyol', 'hepsiburada', 'amazon', 'n11', 'website']]
+        isIn: [ORDER_MARKETPLACES]
       }
     },
     marketplace_order_id: {

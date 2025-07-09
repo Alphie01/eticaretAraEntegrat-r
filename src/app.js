@@ -4,8 +4,9 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const session = require('express-session');
-const passport = require('./config/passport');
+// Load environment variables as early as possible
 require('dotenv').config();
+const passport = require('./config/passport');
 
 const { connectDB, closeDB, testConnection } = require('./config/database');
 const { setupModels } = require('./models');
@@ -28,6 +29,7 @@ const arasCargoRoutes = require('./api/routes/aras-cargo');
 const upsCargoRoutes = require('./api/routes/ups-cargo');
 const yurticiCargoRoutes = require('./api/routes/yurtici-cargo');
 const suratCargoRoutes = require('./api/routes/surat-cargo');
+const dhlCargoRoutes = require('./api/routes/dhl-cargo');
 const errorRoutes = require('./api/routes/errors');
 
 const app = express();
@@ -168,6 +170,7 @@ app.use(`${apiPrefix}/aras-cargo`, arasCargoRoutes);
 app.use(`${apiPrefix}/ups-cargo`, upsCargoRoutes);
 app.use(`${apiPrefix}/yurtici-cargo`, yurticiCargoRoutes);
 app.use(`${apiPrefix}/surat-cargo`, suratCargoRoutes);
+app.use(`${apiPrefix}/dhl-cargo`, dhlCargoRoutes);
 app.use(`${apiPrefix}/errors`, errorRoutes);
 
 // Static files for uploads
