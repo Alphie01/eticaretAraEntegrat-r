@@ -5,6 +5,10 @@ export const marketplaceService = {
   getMarketplaces: () => 
     api.get('/marketplace-keys'),
 
+  // Get marketplace configurations from database
+  getMarketplaceConfigurations: () =>
+    api.get('/marketplace/configurations'),
+
   // Get marketplace statistics
   getMarketplaceStats: () => 
     api.get('/marketplace/stats'),
@@ -79,4 +83,4 @@ export const marketplaceService = {
   },
 }
 
-export default marketplaceService 
+export default marketplaceService

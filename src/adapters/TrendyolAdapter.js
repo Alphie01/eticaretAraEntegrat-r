@@ -20,18 +20,22 @@ class TrendyolAdapter extends MarketplaceAdapter {
       maxRequests: 45, // Trendyol allows 45 requests per minute
     };
 
-
+    // Create Base64 encoded authorization header (C# equivalent)
+    const credentials = Buffer.from(
+      `${this.apiKey}:${this.apiSecret}`,
+      "ascii"
+    ).toString("base64");
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
       headers: {
         "Content-Type": "application/json",
-        "User-Agent": `1087761 - SelfIntegration`,
-      },
-      auth: {
-        username: this.apiKey,
-        password: this.apiSecret,
+        "User-Agent": `${this.supplierId} - SelfIntegration`,
+        Authorization: {
+          username: this.apiKey,
+          password: this.apiSecret,
+        },
       },
     });
 
@@ -112,8 +116,7 @@ class TrendyolAdapter extends MarketplaceAdapter {
         logger.error("Trendyol authentication failed: No response received");
       } else {
         // İstek gönderilemedi veya başka bir hata oluştu
-        logger.error("Trendyol authentication failed:");
-        console.log(error);
+        logger.error("Trendyol authentication failed:", error.message);
       }
 
       throw error;

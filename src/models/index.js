@@ -14,6 +14,9 @@ const { UserNotificationSettings, initUserNotificationSettings, associateUserNot
 const { UserMarketplaceKeys, initUserMarketplaceKeys, associateUserMarketplaceKeys } = require('./UserMarketplaceKeys');
 const { UserMarketplace, initUserMarketplace, associateUserMarketplace } = require('./UserMarketplace');
 
+// Marketplace configuration models
+const { MarketplaceConfiguration, MarketplaceCredentialField, initMarketplaceConfiguration, initMarketplaceCredentialField, associateMarketplaceConfiguration } = require('./MarketplaceConfiguration');
+
 // Product related models
 const { Product, initProduct, associateProduct } = require('./Product');
 const { ProductVariant, initProductVariant, associateProductVariant } = require('./ProductVariant');
@@ -52,6 +55,10 @@ const initModels = () => {
     initUserNotificationSettings();
     initUserMarketplaceKeys();
     initUserMarketplace();
+
+    // Initialize marketplace configuration models
+    initMarketplaceConfiguration();
+    initMarketplaceCredentialField();
 
     // Initialize product models
     initProductCategory();
@@ -93,6 +100,9 @@ const associateModels = () => {
     associateUserNotificationSettings();
     associateUserMarketplaceKeys();
     associateUserMarketplace();
+
+    // Associate marketplace configuration models
+    associateMarketplaceConfiguration();
 
     // Associate product models
     associateProductCategory();
@@ -156,6 +166,10 @@ module.exports = {
   UserMarketplaceKeys,
   UserMarketplace,
   
+  // Marketplace configuration models
+  MarketplaceConfiguration,
+  MarketplaceCredentialField,
+  
   // Product related models
   Product,
   ProductVariant,
@@ -171,4 +185,4 @@ module.exports = {
   
   // Sync related models
   SyncLog
-}; 
+};

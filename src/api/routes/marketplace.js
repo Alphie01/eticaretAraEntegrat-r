@@ -2,6 +2,7 @@ const express = require("express");
 const { protect } = require("../../middleware/auth");
 const UserAdapterManager = require("../../core/UserAdapterManager");
 const { UserMarketplaceKeys } = require("../../models/UserMarketplaceKeys");
+const { MarketplaceConfiguration, MarketplaceCredentialField } = require("../../models/MarketplaceConfiguration");
 const logger = require("../../utils/logger");
 const {
   SUPPORTED_MARKETPLACES,
@@ -759,6 +760,193 @@ router.get("/debug/constraints", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
+    });
+  }
+});
+
+// @desc    Get all marketplace configurations
+// @route   GET /api/v1/marketplace/configurations
+// @access  Public
+router.get("/configurations", async (req, res) => {
+  try {
+    // Get all marketplace configurations from database
+    const marketplaceConfigs = await MarketplaceConfiguration.findAll({
+      where: { is_active: true },
+      include: [{
+        model: MarketplaceCredentialField,
+        as: 'credentialFields',
+        attributes: ['field_key', 'field_label', 'field_type', 'is_required'],
+        order: [['sort_order', 'ASC']]
+      }],
+      order: [['sort_order', 'ASC']]
+    });
+
+    // Transform the data to match frontend expectations
+    const transformedConfigs = marketplaceConfigs.map(config => ({
+      id: config.marketplace_id,
+      name: config.name,
+      logo: config.logo,
+      color: config.color,
+      description: config.description,
+      credentials: config.credentialFields.map(field => ({
+        key: field.field_key,
+        label: field.field_label,
+        type: field.field_type,
+        required: field.is_required
+      }))
+    }));
+
+    logger.info(`Retrieved ${transformedConfigs.length} marketplace configurations`);
+    
+    res.status(200).json({
+      success: true,
+      data: transformedConfigs,
+      count: transformedConfigs.length
+    });
+  } catch (error) {
+    logger.error('Get marketplace configurations failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// @desc    Initialize marketplace configurations (admin only)
+// @route   POST /api/v1/marketplace/configurations/init
+// @access  Public (for development)
+router.post("/configurations/init", async (req, res) => {
+  try {
+    // First create tables if they don't exist
+    const { createMarketplaceTables } = require('../../../scripts/create_marketplace_tables');
+    try {
+      await createMarketplaceTables();
+      logger.info('Marketplace tables created/verified');
+    } catch (tableError) {
+      if (tableError.message.includes('already exists') || tableError.message.includes('already an object')) {
+        logger.info('Marketplace tables already exist');
+      } else {
+        throw tableError;
+      }
+    }
+    
+    // Seed marketplace configurations directly using existing DB connection
+    const MARKETPLACE_CONFIGS = {
+      trendyol: {
+        name: "Trendyol",
+        logo: "🛒",
+        color: "#f27a1a",
+        description: "Türkiye'nin en büyük e-ticaret platformu",
+        credentials: [
+          { key: "apiKey", label: "API Key", type: "text", required: true },
+          { key: "apiSecret", label: "API Secret", type: "password", required: true },
+          { key: "supplierId", label: "Supplier ID", type: "text", required: true },
+        ],
+      },
+      hepsiburada: {
+        name: "Hepsiburada",
+        logo: "🏪",
+        color: "#ff6000",
+        description: "Teknoloji ve genel ürün kategorileri",
+        credentials: [
+          { key: "username", label: "Username", type: "text", required: true },
+          { key: "password", label: "Password", type: "password", required: true },
+          { key: "merchantId", label: "Merchant ID", type: "text", required: false },
+        ],
+      },
+      amazon: {
+        name: "Amazon",
+        logo: "📦",
+        color: "#ff9900",
+        description: "Uluslararası e-ticaret platformu",
+        credentials: [
+          { key: "accessKeyId", label: "Access Key ID", type: "text", required: true },
+          { key: "secretAccessKey", label: "Secret Access Key", type: "password", required: true },
+          { key: "merchantId", label: "Merchant ID", type: "text", required: false },
+        ],
+      },
+      n11: {
+        name: "N11",
+        logo: "🛍️",
+        color: "#f5a623",
+        description: "Çok kategorili alışveriş sitesi",
+        credentials: [
+          { key: "apiKey", label: "API Key", type: "text", required: true },
+          { key: "apiSecret", label: "API Secret", type: "password", required: true },
+        ],
+      },
+    };
+    
+    logger.info('Seeding marketplace configurations...');
+    let createdCount = 0;
+    let updatedCount = 0;
+    
+    for (const [marketplaceId, config] of Object.entries(MARKETPLACE_CONFIGS)) {
+      // Check if marketplace configuration exists
+      let marketplaceConfig = await MarketplaceConfiguration.findOne({
+        where: { marketplace_id: marketplaceId }
+      });
+      
+      if (marketplaceConfig) {
+        // Update existing configuration
+        await marketplaceConfig.update({
+          name: config.name,
+          logo: config.logo,
+          color: config.color,
+          description: config.description
+        });
+        updatedCount++;
+        logger.info(`Updated marketplace configuration for ${marketplaceId}`);
+      } else {
+        // Create new configuration
+        marketplaceConfig = await MarketplaceConfiguration.create({
+          marketplace_id: marketplaceId,
+          name: config.name,
+          logo: config.logo,
+          color: config.color,
+          description: config.description,
+          sort_order: 0,
+          is_active: true
+        });
+        createdCount++;
+        logger.info(`Created marketplace configuration for ${marketplaceId}`);
+      }
+      
+      // Clear existing credential fields for this marketplace
+      await MarketplaceCredentialField.destroy({
+        where: { marketplace_id: marketplaceId }
+      });
+      
+      // Create credential fields
+      for (let j = 0; j < config.credentials.length; j++) {
+        const credential = config.credentials[j];
+        
+        await MarketplaceCredentialField.create({
+          marketplace_id: marketplaceId,
+          field_key: credential.key,
+          field_label: credential.label,
+          field_type: credential.type,
+          is_required: credential.required,
+          sort_order: j
+        });
+      }
+      
+      logger.info(`Created ${config.credentials.length} credential fields for ${marketplaceId}`);
+    }
+    
+    logger.info(`Marketplace configurations seeding completed! Created: ${createdCount}, Updated: ${updatedCount}`);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Marketplace configurations initialized successfully',
+      created: createdCount,
+      updated: updatedCount
+    });
+  } catch (error) {
+    logger.error('Initialize marketplace configurations failed:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 });

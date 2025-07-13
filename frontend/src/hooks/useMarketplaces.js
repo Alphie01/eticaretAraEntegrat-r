@@ -128,6 +128,22 @@ export const useTestMarketplaceConnection = () => {
   )
 }
 
+// Get marketplace configurations from database
+export const useMarketplaceConfigurations = () => {
+  return useQuery(
+    ['marketplace-configurations'],
+    () => marketplaceService.getMarketplaceConfigurations(),
+    {
+      staleTime: 10 * 60 * 1000, // 10 minutes (configurations change rarely)
+      refetchOnWindowFocus: false,
+      onError: (error) => {
+        console.error('Marketplace configurations error:', error)
+        toast.error('Pazaryeri konfigürasyonları alınamadı')
+      }
+    }
+  )
+}
+
 // Specific marketplace hooks
 export const useTrendyolData = () => {
   const orders = useQuery(['trendyol', 'orders'], () => marketplaceService.trendyol.getOrders())
@@ -183,4 +199,4 @@ export const usePTTAVMData = () => {
   const products = useQuery(['pttavm', 'products'], () => marketplaceService.pttavm.getProducts())
   
   return { orders, products }
-} 
+}

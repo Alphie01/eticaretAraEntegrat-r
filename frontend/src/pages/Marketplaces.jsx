@@ -44,11 +44,13 @@ import {
 import {
   useMarketplaces,
   useMarketplaceStats,
+  useMarketplaceConfigurations,
   useSyncMarketplace,
   useTestMarketplaceConnection,
   useUpdateMarketplaceSettings,
 } from "../hooks/useMarketplaces";
-import { supportedMarketplaces } from "../constants/marketplaces";
+// Import from API instead of constants
+// import { supportedMarketplaces } from "../constants/marketplaces";
 
 function MarketplaceCard({ marketplace, onEdit, onTest, onSync }) {
   const [syncEnabled, setSyncEnabled] = useState(
@@ -71,7 +73,6 @@ function MarketplaceCard({ marketplace, onEdit, onTest, onSync }) {
   };
 
   const getStatusText = () => {
-   
     console.log(marketplace);
     switch (marketplace.status) {
       case "connected":
@@ -266,13 +267,22 @@ function MarketplaceCard({ marketplace, onEdit, onTest, onSync }) {
   );
 }
 
-function CredentialsModal({ open, onClose, marketplace, onSubmit }) {
+function CredentialsModal({ open, onClose, marketplace, onSubmit, supportedMarketplaces }) {
   const [credentials, setCredentials] = useState({});
   const [loading, setLoading] = useState(false);
 
-  const marketplaceConfig = supportedMarketplaces.find(
-    (m) => m.id === marketplace
-  );
+  // Ensure supportedMarketplaces is an array before using find
+  const marketplaceConfig = Array.isArray(supportedMarketplaces) 
+    ? supportedMarketplaces.find((m) => m.id === marketplace)
+    : null;
+
+  // Debug logging
+  console.log("🔍 CredentialsModal Debug:", {
+    marketplace,
+    supportedMarketplaces,
+    isArray: Array.isArray(supportedMarketplaces),
+    marketplaceConfig
+  });
 
   const handleSubmit = async () => {
     if (!marketplaceConfig) return;
@@ -377,6 +387,13 @@ function Marketplaces() {
   } = useMarketplaces();
   const { data: statsData, isLoading: statsLoading } = useMarketplaceStats();
 
+  // Get marketplace configurations from database
+  const {
+    data: configurationsData,
+    isLoading: configurationsLoading,
+    isError: configurationsError,
+  } = useMarketplaceConfigurations();
+
   // Debug logging
   console.log("🔍 Marketplaces API Response:", {
     data: marketplacesData,
@@ -390,87 +407,104 @@ function Marketplaces() {
     fullResponse: marketplacesData,
   });
 
+  console.log("🔍 Marketplace Configurations:", {
+    data: configurationsData,
+    isLoading: configurationsLoading,
+    isError: configurationsError,
+  });
+
+  // Use marketplace configurations from database instead of constants
+  const supportedMarketplaces = configurationsData?.data || [];
+  
+  // Debug logging for marketplace configurations
+  console.log("🔍 Marketplace Configurations Debug:", {
+    configurationsData,
+    supportedMarketplaces,
+    isArray: Array.isArray(supportedMarketplaces),
+    length: supportedMarketplaces?.length
+  });
+
   // Get marketplace data - merge with supported marketplaces
-  const marketplaceData = supportedMarketplaces.map((supported) => {
-    // Find user's credentials for this marketplace from the database
-    // Handle different possible data structures
-    let userCredentials = null;
-    let statusData = null;
+  const marketplaceData = Array.isArray(supportedMarketplaces) ? supportedMarketplaces.map((supported) => {
+      // Find user's credentials for this marketplace from the database
+      // Handle different possible data structures
+      let userCredentials = null;
+      let statusData = null;
 
-    // The API returns data in this structure:
-    // { success: true, data: [...], configurations: [...], marketplaces: [...] }
-    if (marketplacesData?.data) {
-      // First try to get credentials from the main data array
-      if (Array.isArray(marketplacesData.data)) {
-        userCredentials = marketplacesData.data.find(
-          (cred) => cred.marketplace === supported.id
-        );
-      }
-      // If not found, try configurations array
-      if (
-        !userCredentials &&
-        marketplacesData.data.configurations &&
-        Array.isArray(marketplacesData.data.configurations)
-      ) {
-        userCredentials = marketplacesData.data.configurations.find(
-          (config) => config.marketplace === supported.id
-        );
-      }
-      // If still not found, try the root level configurations
-      if (
-        !userCredentials &&
-        marketplacesData.configurations &&
-        Array.isArray(marketplacesData.configurations)
-      ) {
-        userCredentials = marketplacesData.configurations.find(
-          (config) => config.marketplace === supported.id
-        );
+      // The API returns data in this structure:
+      // { success: true, data: [...], configurations: [...], marketplaces: [...] }
+      if (marketplacesData?.data) {
+        // First try to get credentials from the main data array
+        if (Array.isArray(marketplacesData.data)) {
+          userCredentials = marketplacesData.data.find(
+            (cred) => cred.marketplace === supported.id
+          );
+        }
+        // If not found, try configurations array
+        if (
+          !userCredentials &&
+          marketplacesData.data.configurations &&
+          Array.isArray(marketplacesData.data.configurations)
+        ) {
+          userCredentials = marketplacesData.data.configurations.find(
+            (config) => config.marketplace === supported.id
+          );
+        }
+        // If still not found, try the root level configurations
+        if (
+          !userCredentials &&
+          marketplacesData.configurations &&
+          Array.isArray(marketplacesData.configurations)
+        ) {
+          userCredentials = marketplacesData.configurations.find(
+            (config) => config.marketplace === supported.id
+          );
+        }
+
+        // Get status data from marketplaces array
+        if (
+          marketplacesData.data.marketplaces &&
+          Array.isArray(marketplacesData.data.marketplaces)
+        ) {
+          statusData = marketplacesData.data.marketplaces.find(
+            (m) => m.id === supported.id
+          );
+        }
+        // If not found, try root level marketplaces
+        if (
+          !statusData &&
+          marketplacesData.marketplaces &&
+          Array.isArray(marketplacesData.marketplaces)
+        ) {
+          statusData = marketplacesData.marketplaces.find(
+            (m) => m.id === supported.id
+          );
+        }
       }
 
-      // Get status data from marketplaces array
-      if (
-        marketplacesData.data.marketplaces &&
-        Array.isArray(marketplacesData.data.marketplaces)
-      ) {
-        statusData = marketplacesData.data.marketplaces.find(
-          (m) => m.id === supported.id
-        );
+      // Safety check - if no credentials found, assume none exist
+      if (!userCredentials) {
+        /* console.log(`No credentials found for ${supported.id}`); */
       }
-      // If not found, try root level marketplaces
-      if (
-        !statusData &&
-        marketplacesData.marketplaces &&
-        Array.isArray(marketplacesData.marketplaces)
-      ) {
-        statusData = marketplacesData.marketplaces.find(
-          (m) => m.id === supported.id
-        );
-      }
-    }
 
-    // Safety check - if no credentials found, assume none exist
-    if (!userCredentials) {
-      /* console.log(`No credentials found for ${supported.id}`); */
-    }
-
-    /*     console.log("Marketplace data:", marketplacesData?.data);
+      /*     console.log("Marketplace data:", marketplacesData?.data);
     console.log("User credentials for", supported.id, ":", userCredentials); */
 
-    return {
-      ...supported,
-      hasCredentials: !!userCredentials,
-      isActive: userCredentials?.is_active || false,
-      isConnected: !!userCredentials?.has_api_key,
-      status:
-        statusData?.status ||
-        (userCredentials?.has_api_key ? "connected" : "error"),
-      orders: statusData?.orders || 0,
-      products: statusData?.products || 0,
-      revenue: statusData?.revenue || "₺0",
-      lastUsed: userCredentials?.last_sync_date,
-      credentialsId: userCredentials?.id,
-    };
-  });
+      return {
+        ...supported,
+        hasCredentials: !!userCredentials,
+        isActive: userCredentials?.is_active || false,
+        isConnected: !!userCredentials?.has_api_key,
+        status:
+          statusData?.status ||
+          (userCredentials?.has_api_key ? "connected" : "error"),
+        orders: statusData?.orders || 0,
+        products: statusData?.products || 0,
+        revenue: statusData?.revenue || "₺0",
+        lastUsed: userCredentials?.last_sync_date,
+        credentialsId: userCredentials?.id,
+      };
+    }) : [];
 
   const activeCount = marketplaceData.filter((m) => m.isConnected).length;
   const configuredCount = marketplaceData.filter(
@@ -488,9 +522,9 @@ function Marketplaces() {
       const mappedCredentials = {};
 
       // Map based on marketplace type
-      const marketplaceConfig = supportedMarketplaces.find(
-        (m) => m.id === marketplaceId
-      );
+      const marketplaceConfig = Array.isArray(supportedMarketplaces) 
+        ? supportedMarketplaces.find((m) => m.id === marketplaceId)
+        : null;
 
       if (marketplaceConfig) {
         // Map field names to standard backend fields
@@ -628,7 +662,7 @@ function Marketplaces() {
   };
 
   // Loading state
-  if (marketplacesLoading) {
+  if (marketplacesLoading || configurationsLoading) {
     return (
       <Box
         className="fade-in"
@@ -645,11 +679,14 @@ function Marketplaces() {
   }
 
   // Error state
-  if (marketplacesError) {
+  if (marketplacesError || configurationsError) {
     return (
       <Box className="fade-in">
         <Alert severity="error">
-          Pazaryeri bilgileri yüklenirken hata oluştu. Lütfen sayfayı yenileyin.
+          {configurationsError
+            ? "Pazaryeri konfigürasyonları yüklenirken hata oluştu."
+            : "Pazaryeri bilgileri yüklenirken hata oluştu."}
+          Lütfen sayfayı yenileyin.
         </Alert>
       </Box>
     );
@@ -772,12 +809,15 @@ function Marketplaces() {
       </Grid>
 
       {/* Credentials Modal */}
-      <CredentialsModal
-        open={credentialsModalOpen}
-        onClose={() => setCredentialsModalOpen(false)}
-        marketplace={selectedMarketplace}
-        onSubmit={handleSaveCredentials}
-      />
+      {Array.isArray(supportedMarketplaces) && supportedMarketplaces.length > 0 && (
+        <CredentialsModal
+          open={credentialsModalOpen}
+          onClose={() => setCredentialsModalOpen(false)}
+          marketplace={selectedMarketplace}
+          onSubmit={handleSaveCredentials}
+          supportedMarketplaces={supportedMarketplaces}
+        />
+      )}
     </Box>
   );
 }
