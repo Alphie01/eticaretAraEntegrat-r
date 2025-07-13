@@ -2,7 +2,11 @@ const express = require("express");
 const { protect } = require("../../middleware/auth");
 const UserAdapterManager = require("../../core/UserAdapterManager");
 const { UserMarketplaceKeys } = require("../../models/UserMarketplaceKeys");
-const { MarketplaceConfiguration, MarketplaceCredentialField } = require("../../models/MarketplaceConfiguration");
+const {
+  MarketplaceConfiguration,
+  MarketplaceCredentialField,
+} = require("../../models/MarketplaceConfiguration");
+const { ProductImage } = require('../../models/ProductImage');
 const logger = require("../../utils/logger");
 const {
   SUPPORTED_MARKETPLACES,
@@ -11,7 +15,13 @@ const {
   getMarketplaceLogo,
   getMarketplaceDescription,
 } = require("../../constants/marketplaces");
-
+const {
+  Product,
+  ProductVariant,
+  ProductVariantAttribute,
+} = require("../../models");
+const { ProductMarketplace } = require("../../models/ProductMarketplace");
+const { connectDB, getSequelize } = require("../../config/database");
 const router = express.Router();
 
 // Cache for user adapter managers to avoid recreating them
@@ -256,6 +266,217 @@ router.get("/:marketplace/products", protect, async (req, res) => {
     });
   }
 });
+
+// @desc    Get marketplace products
+// @route   GET /api/v1/marketplace/:marketplace/sync
+// @access  Private
+router.get("/:marketplace/sync", protect, async (req, res) => {
+  try {
+    const { marketplace } = req.params;
+    const { page = 0, limit = 50, ...otherParams } = req.query;
+
+    const manager = await getUserAdapterManager(req.user.id);
+    const adapter = manager.getAdapter(marketplace);
+
+    const result = await adapter.getProducts(
+      {
+        page: parseInt(page),
+        size: parseInt(limit),
+        ...otherParams,
+      },
+      (isFullFetch = true) // Force full fetch for sync
+    );
+
+    var insertedProductContentIds = [];
+
+    for (const element of result.products) {
+      const product = await Product.findOne({
+        where: { productContentId: element.productContentId },
+      });
+
+      if (
+        !product &&
+        !insertedProductContentIds.includes(element.productContentId)
+      ) {
+        var s = await Product.create({
+          productContentId: element.productContentId,
+          name: element.title,
+          user_id: req.user.id,
+          brand: element.brand,
+          description: element.description,
+          base_price: element.listPrice,
+          total_stock: element.quantity,
+          status: "active",
+        });
+
+
+        insertImagesForProduct(element.images, s.id);
+
+        console.log(s.id);
+
+        insertMarketplacesAndVariant(element, "Main", s.id, marketplace);
+
+        insertedProductContentIds.push(element.productContentId);
+      } else {
+        const productId = await Product.findOne({
+          where: { productContentId: element.productContentId },
+        });
+        console.log("productVariantId", productId.id);
+        var productVariantId = await ProductVariant.findOne({
+          where: { productCode: element.productCode },
+        });
+        if (!productVariantId) {
+          insertMarketplacesAndVariant(
+            element,
+            "Variant",
+            productId.id,
+            marketplace
+          );
+        } else {
+          //TODO UPDATE attributes
+          const updatedVariant = await ProductVariant.update(
+            {
+              product_id: productId.id,
+              productCode: element.productCode,
+              name: `${element.title} - Variant`,
+              sku: element.barcode,
+              productContentId: element.productContentId,
+              barcode: element.barcode,
+              price: element.listPrice,
+              discounted_price: element.salePrice,
+              stock: element.quantity || 0,
+              is_active: true,
+            },
+            {
+              where: { id: productVariantId.id },
+            }
+          );
+          console.log("updated");
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    logger.error("Get marketplace products failed:", error);
+    res.status(500).json({
+      success: false,
+      error:
+        error.message || "Server error while fetching marketplace products",
+    });
+  }
+});
+
+const insertAttributes = async (attributeList, variant_id) => {
+  attributeList.forEach(async (attribute) => {
+    const attributeId = await ProductVariantAttribute.create({
+      variant_id: variant_id,
+      attribute_name: attribute.attributeName,
+      attribute_value: attribute.attributeValue,
+    });
+  });
+};
+
+const insertImagesForProduct = async (imageList, productId) => {
+  imageList.forEach(async (imageUrl, i) => {
+    await ProductImage.create({
+      product_id: productId,
+      image_url: imageUrl.url,
+      alt_text: `Image ${i + 1} for product ${productId}`,
+      display_order: i,
+      is_main: i === 0,
+    });
+  });
+};
+
+const insertMarketplacesAndVariant = async (
+  variant,
+  variantType = "Main",
+  productId,
+  marketplace
+) => {
+  const defaultVariant = await ProductVariant.create({
+    product_id: productId,
+    productCode: variant.productCode,
+    name: `${variant.title} - ${variantType}`,
+    sku: variant.barcode,
+    productContentId: variant.productContentId,
+    barcode: variant.barcode,
+    price: variant.listPrice,
+    discounted_price: variant.salePrice,
+    stock: variant.quantity || 0,
+    is_active: true,
+  });
+  insertAttributes(variant.attributes, defaultVariant.id);
+  const marketPlaceId = await ProductMarketplace.findOne({
+    where: {
+      product_id: productId,
+      marketplace: marketplace,
+      marketplace_product_id: variant.productCode,
+      marketplace_sku: variant.productContentId,
+    },
+  });
+  if (!marketPlaceId) {
+    await ProductMarketplace.create({
+      product_id: productId,
+      marketplace: marketplace,
+      marketplace_product_id: variant.productCode,
+      marketplace_sku: variant.productContentId,
+      status: !variant.rejected ? "active" : "pending",
+      price: variant.listPrice,
+      discounted_price: variant.salePrice,
+      barcode: variant.barcode,
+      stock_quantity: variant.quantity || 0,
+      is_active: true,
+      auto_sync: true,
+      price_multiplier: 1,
+      stock_buffer: 0,
+      last_sync_date: new Date(),
+    });
+  } else {
+    await ProductMarketplace.update(
+      {
+        product_id: productId,
+        marketplace: marketplace,
+        marketplace_product_id: variant.productCode,
+        marketplace_sku: variant.productContentId,
+        status: !variant.rejected ? "active" : "pending",
+        price: variant.listPrice,
+        discounted_price: variant.salePrice,
+        stock_quantity: variant.quantity || 0,
+        barcode: variant.barcode,
+        is_active: true,
+        auto_sync: true,
+        price_multiplier: 1,
+        stock_buffer: 0,
+        last_sync_date: new Date(),
+      },
+      {
+        where: { id: marketPlaceId.id },
+      }
+    );
+  }
+};
+
+const isProductInserted = async (productContentId) => {
+  const sequelize = getSequelize();
+
+  const query = `
+   SELECT * FROM products p WHERE p.productContentId = :productContentId
+  `;
+
+  const result = await sequelize.query(query, {
+    replacements: { productContentId },
+    type: sequelize.QueryTypes.SELECT,
+  });
+
+  console.log("isProductInserted result:", result, productContentId);
+
+  return !(result.length > 0);
+};
 
 // @desc    Get marketplace orders
 // @route   GET /api/v1/marketplace/:marketplace/orders
@@ -773,42 +994,46 @@ router.get("/configurations", async (req, res) => {
     // Get all marketplace configurations from database
     const marketplaceConfigs = await MarketplaceConfiguration.findAll({
       where: { is_active: true },
-      include: [{
-        model: MarketplaceCredentialField,
-        as: 'credentialFields',
-        attributes: ['field_key', 'field_label', 'field_type', 'is_required'],
-        order: [['sort_order', 'ASC']]
-      }],
-      order: [['sort_order', 'ASC']]
+      include: [
+        {
+          model: MarketplaceCredentialField,
+          as: "credentialFields",
+          attributes: ["field_key", "field_label", "field_type", "is_required"],
+          order: [["sort_order", "ASC"]],
+        },
+      ],
+      order: [["sort_order", "ASC"]],
     });
 
     // Transform the data to match frontend expectations
-    const transformedConfigs = marketplaceConfigs.map(config => ({
+    const transformedConfigs = marketplaceConfigs.map((config) => ({
       id: config.marketplace_id,
       name: config.name,
       logo: config.logo,
       color: config.color,
       description: config.description,
-      credentials: config.credentialFields.map(field => ({
+      credentials: config.credentialFields.map((field) => ({
         key: field.field_key,
         label: field.field_label,
         type: field.field_type,
-        required: field.is_required
-      }))
+        required: field.is_required,
+      })),
     }));
 
-    logger.info(`Retrieved ${transformedConfigs.length} marketplace configurations`);
-    
+    logger.info(
+      `Retrieved ${transformedConfigs.length} marketplace configurations`
+    );
+
     res.status(200).json({
       success: true,
       data: transformedConfigs,
-      count: transformedConfigs.length
+      count: transformedConfigs.length,
     });
   } catch (error) {
-    logger.error('Get marketplace configurations failed:', error);
+    logger.error("Get marketplace configurations failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });
@@ -819,18 +1044,23 @@ router.get("/configurations", async (req, res) => {
 router.post("/configurations/init", async (req, res) => {
   try {
     // First create tables if they don't exist
-    const { createMarketplaceTables } = require('../../../scripts/create_marketplace_tables');
+    const {
+      createMarketplaceTables,
+    } = require("../../../scripts/create_marketplace_tables");
     try {
       await createMarketplaceTables();
-      logger.info('Marketplace tables created/verified');
+      logger.info("Marketplace tables created/verified");
     } catch (tableError) {
-      if (tableError.message.includes('already exists') || tableError.message.includes('already an object')) {
-        logger.info('Marketplace tables already exist');
+      if (
+        tableError.message.includes("already exists") ||
+        tableError.message.includes("already an object")
+      ) {
+        logger.info("Marketplace tables already exist");
       } else {
         throw tableError;
       }
     }
-    
+
     // Seed marketplace configurations directly using existing DB connection
     const MARKETPLACE_CONFIGS = {
       trendyol: {
@@ -840,8 +1070,18 @@ router.post("/configurations/init", async (req, res) => {
         description: "Türkiye'nin en büyük e-ticaret platformu",
         credentials: [
           { key: "apiKey", label: "API Key", type: "text", required: true },
-          { key: "apiSecret", label: "API Secret", type: "password", required: true },
-          { key: "supplierId", label: "Supplier ID", type: "text", required: true },
+          {
+            key: "apiSecret",
+            label: "API Secret",
+            type: "password",
+            required: true,
+          },
+          {
+            key: "supplierId",
+            label: "Supplier ID",
+            type: "text",
+            required: true,
+          },
         ],
       },
       hepsiburada: {
@@ -851,8 +1091,18 @@ router.post("/configurations/init", async (req, res) => {
         description: "Teknoloji ve genel ürün kategorileri",
         credentials: [
           { key: "username", label: "Username", type: "text", required: true },
-          { key: "password", label: "Password", type: "password", required: true },
-          { key: "merchantId", label: "Merchant ID", type: "text", required: false },
+          {
+            key: "password",
+            label: "Password",
+            type: "password",
+            required: true,
+          },
+          {
+            key: "merchantId",
+            label: "Merchant ID",
+            type: "text",
+            required: false,
+          },
         ],
       },
       amazon: {
@@ -861,9 +1111,24 @@ router.post("/configurations/init", async (req, res) => {
         color: "#ff9900",
         description: "Uluslararası e-ticaret platformu",
         credentials: [
-          { key: "accessKeyId", label: "Access Key ID", type: "text", required: true },
-          { key: "secretAccessKey", label: "Secret Access Key", type: "password", required: true },
-          { key: "merchantId", label: "Merchant ID", type: "text", required: false },
+          {
+            key: "accessKeyId",
+            label: "Access Key ID",
+            type: "text",
+            required: true,
+          },
+          {
+            key: "secretAccessKey",
+            label: "Secret Access Key",
+            type: "password",
+            required: true,
+          },
+          {
+            key: "merchantId",
+            label: "Merchant ID",
+            type: "text",
+            required: false,
+          },
         ],
       },
       n11: {
@@ -873,28 +1138,33 @@ router.post("/configurations/init", async (req, res) => {
         description: "Çok kategorili alışveriş sitesi",
         credentials: [
           { key: "apiKey", label: "API Key", type: "text", required: true },
-          { key: "apiSecret", label: "API Secret", type: "password", required: true },
+          {
+            key: "apiSecret",
+            label: "API Secret",
+            type: "password",
+            required: true,
+          },
         ],
       },
     };
-    
-    logger.info('Seeding marketplace configurations...');
+
+    logger.info("Seeding marketplace configurations...");
     let createdCount = 0;
     let updatedCount = 0;
-    
+
     for (const [marketplaceId, config] of Object.entries(MARKETPLACE_CONFIGS)) {
       // Check if marketplace configuration exists
       let marketplaceConfig = await MarketplaceConfiguration.findOne({
-        where: { marketplace_id: marketplaceId }
+        where: { marketplace_id: marketplaceId },
       });
-      
+
       if (marketplaceConfig) {
         // Update existing configuration
         await marketplaceConfig.update({
           name: config.name,
           logo: config.logo,
           color: config.color,
-          description: config.description
+          description: config.description,
         });
         updatedCount++;
         logger.info(`Updated marketplace configuration for ${marketplaceId}`);
@@ -907,47 +1177,51 @@ router.post("/configurations/init", async (req, res) => {
           color: config.color,
           description: config.description,
           sort_order: 0,
-          is_active: true
+          is_active: true,
         });
         createdCount++;
         logger.info(`Created marketplace configuration for ${marketplaceId}`);
       }
-      
+
       // Clear existing credential fields for this marketplace
       await MarketplaceCredentialField.destroy({
-        where: { marketplace_id: marketplaceId }
+        where: { marketplace_id: marketplaceId },
       });
-      
+
       // Create credential fields
       for (let j = 0; j < config.credentials.length; j++) {
         const credential = config.credentials[j];
-        
+
         await MarketplaceCredentialField.create({
           marketplace_id: marketplaceId,
           field_key: credential.key,
           field_label: credential.label,
           field_type: credential.type,
           is_required: credential.required,
-          sort_order: j
+          sort_order: j,
         });
       }
-      
-      logger.info(`Created ${config.credentials.length} credential fields for ${marketplaceId}`);
+
+      logger.info(
+        `Created ${config.credentials.length} credential fields for ${marketplaceId}`
+      );
     }
-    
-    logger.info(`Marketplace configurations seeding completed! Created: ${createdCount}, Updated: ${updatedCount}`);
-    
+
+    logger.info(
+      `Marketplace configurations seeding completed! Created: ${createdCount}, Updated: ${updatedCount}`
+    );
+
     res.status(200).json({
       success: true,
-      message: 'Marketplace configurations initialized successfully',
+      message: "Marketplace configurations initialized successfully",
       created: createdCount,
-      updated: updatedCount
+      updated: updatedCount,
     });
   } catch (error) {
-    logger.error('Initialize marketplace configurations failed:', error);
+    logger.error("Initialize marketplace configurations failed:", error);
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
     });
   }
 });

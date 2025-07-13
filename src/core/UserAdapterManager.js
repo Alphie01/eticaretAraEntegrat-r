@@ -94,7 +94,6 @@ class UserAdapterManager {
         ...credentials,
       };
 
-      console.log("Adapter config:", adapterConfig);
       let adapter;
 
       switch (marketplace) {

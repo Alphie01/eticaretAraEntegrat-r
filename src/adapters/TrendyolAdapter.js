@@ -118,22 +118,60 @@ class TrendyolAdapter extends MarketplaceAdapter {
     }
   }
 
-  async getProducts(params = {}) {
+  async getProducts(params = {}, isFullFetch = false) {
     try {
-      const { page = 0, size = 50, approved = true, barcode } = params;
+      let { page = 0, size = 50, approved = true, barcode } = params;
+      let products = [];
+      let totalPages = 0;
 
-      const response = await this.axiosInstance.get(
-        `/integration/product/sellers/${this.supplierId}/products`,
-        {
-          params: { page, size, approved, barcode },
+      // ✅ Sadece ilk sayfayı çek (isFullFetch = false ise)
+      if (!isFullFetch) {
+        const response = await this.axiosInstance.get(
+          `/integration/product/sellers/${this.supplierId}/products`,
+          {
+            params: { page, size, approved, barcode },
+          }
+        );
+
+        const content = response.data?.content || [];
+
+        return {
+          products: content,
+          totalElements: response.data?.totalElements || content.length,
+          totalPages: response.data?.totalPages || 1,
+          page: response.data?.pageable?.pageNumber || 0,
+        };
+      }
+
+      // ✅ Tüm ürünleri çek (isFullFetch = true ise)
+      let fetchUntilLastProduct = true;
+
+      while (fetchUntilLastProduct) {
+        const response = await this.axiosInstance.get(
+          `/integration/product/sellers/${this.supplierId}/products`,
+          {
+            params: { page, size, approved, barcode },
+          }
+        );
+
+        const content = response.data?.content || [];
+
+        // Veri kalmadıysa çık
+        if (content.length === 0) {
+          fetchUntilLastProduct = false;
+          totalPages = response.data?.totalPages || page + 1;
+          break;
         }
-      );
+
+        products = products.concat(content);
+        page++;
+      }
 
       return {
-        products: response.data.content || [],
-        totalElements: response.data.totalElements,
-        totalPages: response.data.totalPages,
-        page: response.data.page,
+        products: products,
+        totalElements: products.length,
+        totalPages: totalPages,
+        page: page,
       };
     } catch (error) {
       this.handleApiError(error, "GET_PRODUCTS");
@@ -181,14 +219,13 @@ class TrendyolAdapter extends MarketplaceAdapter {
 
   async deleteProduct(productId) {
     try {
-
       var body = {
         items: [
           {
             barcode: productId, // Trendyol uses barcode for deletion
           },
-        ]
-      }
+        ],
+      };
 
       await this.axiosInstance.delete(
         `/integration/product/sellers/${this.supplierId}/products`,

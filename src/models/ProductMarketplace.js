@@ -4,6 +4,7 @@ const { SUPPORTED_MARKETPLACES } = require('../constants/marketplaces');
 
 class ProductMarketplace extends Model {}
 
+/* TODO:marketplaces'a kaydet */
 // Initialize ProductMarketplace model
 const initProductMarketplace = () => {
   const sequelize = getSequelize();
@@ -30,6 +31,10 @@ const initProductMarketplace = () => {
       }
     },
     marketplace_product_id: {
+      type: DataTypes.STRING(100),
+      allowNull: true
+    },
+    barcode: {
       type: DataTypes.STRING(100),
       allowNull: true
     },
