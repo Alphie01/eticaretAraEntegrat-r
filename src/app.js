@@ -31,6 +31,7 @@ const yurticiCargoRoutes = require('./api/routes/yurtici-cargo');
 const suratCargoRoutes = require('./api/routes/surat-cargo');
 const dhlCargoRoutes = require('./api/routes/dhl-cargo');
 const errorRoutes = require('./api/routes/errors');
+const paymentRoutes = require('./api/routes/payments');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -172,6 +173,7 @@ app.use(`${apiPrefix}/yurtici-cargo`, yurticiCargoRoutes);
 app.use(`${apiPrefix}/surat-cargo`, suratCargoRoutes);
 app.use(`${apiPrefix}/dhl-cargo`, dhlCargoRoutes);
 app.use(`${apiPrefix}/errors`, errorRoutes);
+app.use(`${apiPrefix}/payments`, paymentRoutes);
 
 // Static files for uploads
 app.use('/uploads', express.static('uploads'));

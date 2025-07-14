@@ -6,7 +6,7 @@ const {
   MarketplaceConfiguration,
   MarketplaceCredentialField,
 } = require("../../models/MarketplaceConfiguration");
-const { ProductImage } = require('../../models/ProductImage');
+const { ProductImage } = require("../../models/ProductImage");
 const logger = require("../../utils/logger");
 const {
   SUPPORTED_MARKETPLACES,
@@ -20,6 +20,7 @@ const {
   ProductVariant,
   ProductVariantAttribute,
 } = require("../../models");
+const { Order } = require("../../models/Order");
 const { ProductMarketplace } = require("../../models/ProductMarketplace");
 const { connectDB, getSequelize } = require("../../config/database");
 const router = express.Router();
@@ -309,7 +310,6 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
           status: "active",
         });
 
-
         insertImagesForProduct(element.images, s.id);
 
         console.log(s.id);
@@ -461,23 +461,6 @@ const insertMarketplacesAndVariant = async (
   }
 };
 
-const isProductInserted = async (productContentId) => {
-  const sequelize = getSequelize();
-
-  const query = `
-   SELECT * FROM products p WHERE p.productContentId = :productContentId
-  `;
-
-  const result = await sequelize.query(query, {
-    replacements: { productContentId },
-    type: sequelize.QueryTypes.SELECT,
-  });
-
-  console.log("isProductInserted result:", result, productContentId);
-
-  return !(result.length > 0);
-};
-
 // @desc    Get marketplace orders
 // @route   GET /api/v1/marketplace/:marketplace/orders
 // @access  Private
@@ -507,6 +490,59 @@ router.get("/:marketplace/orders", protect, async (req, res) => {
     });
   }
 });
+
+router.get("/:marketplace/orders/sync", protect, async (req, res) => {
+  try {
+    const { marketplace } = req.params;
+    const { page = 0, limit = 50, ...otherParams } = req.query;
+
+    const manager = await getUserAdapterManager(req.user.id);
+    const adapter = manager.getAdapter(marketplace);
+
+    const result = await adapter.getOrders({
+      page: parseInt(page),
+      size: parseInt(limit),
+      ...otherParams,
+    });
+
+    // Sync orders with the local database
+    await syncOrdersWithDatabase(result.data);
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    logger.error("Get marketplace orders failed:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Server error while fetching marketplace orders",
+    });
+  }
+});
+
+const syncOrdersWithDatabase = async (orders) => {
+  for (const order of orders) {
+    // Check if order already exists
+    const existingOrder = await Order.findOne({
+      where: {
+        marketplace_order_id: order.orderId,
+        marketplace_name: order.marketplace,
+      },
+    });
+    if (!existingOrder) {
+      // Create new order
+      const newOrder = await Order.create({
+        marketplace_order_id: order.orderId,
+        marketplace_name: order.marketplace,
+        user_id: order.userId,
+        total_amount: order.totalAmount,
+        status: order.status,
+      });
+      logger.info(`New order created: ${newOrder.id}`);
+    }
+  }
+};
 
 // @desc    Get marketplace categories
 // @route   GET /api/v1/marketplace/:marketplace/categories

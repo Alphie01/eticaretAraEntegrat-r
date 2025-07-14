@@ -15,6 +15,7 @@
     "db:oauth-migration": "node scripts/add_oauth_migration.js",
     "db:encrypt-keys": "node scripts/encrypt_api_keys.js --migrate",
     "db:test-encryption": "node scripts/encrypt_api_keys.js --test",
+    "db:create-paytr": "node scripts/create_paytr_tables.js",
     "jobs:worker": "node src/jobs/worker.js"
   },
   "keywords": [

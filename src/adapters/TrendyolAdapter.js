@@ -292,7 +292,9 @@ class TrendyolAdapter extends MarketplaceAdapter {
   }
 
   async getOrders(params = {}) {
-    try {
+    console.log("Fetching orders with params:");
+    /* try {
+
       const {
         page = 0,
         size = 50,
@@ -303,7 +305,7 @@ class TrendyolAdapter extends MarketplaceAdapter {
         startDate,
         endDate,
       } = params;
-
+      
       // Trendyol'da mevcut tüm sipariş statüleri
       const allTrendyolStatuses = [
         "Created",
@@ -330,18 +332,7 @@ class TrendyolAdapter extends MarketplaceAdapter {
         for (const statusValue of allTrendyolStatuses) {
           try {
             const response = await this.axiosInstance.get(
-              `/sapigw/suppliers/${this.supplierId}/orders`,
-              {
-                params: {
-                  page,
-                  size,
-                  status: statusValue,
-                  orderByField,
-                  orderByDirection,
-                  startDate,
-                  endDate,
-                },
-              }
+              `/integration/order/sellers/1087761/orders`,
             );
 
             if (response.data.content && response.data.content.length > 0) {
@@ -409,6 +400,14 @@ class TrendyolAdapter extends MarketplaceAdapter {
       }
     } catch (error) {
       this.handleApiError(error, "GET_ORDERS");
+    } */
+
+    try {
+      var response = await this.axiosInstance.get(`/integration/order/sellers/${this.supplierId}/orders`);
+      
+      return { success: true , data: response.data };
+    } catch (error) {
+      this.handleApiError(error, "DELETE_PRODUCT");
     }
   }
 

@@ -33,6 +33,10 @@ const { OrderStatusHistory, initOrderStatusHistory, associateOrderStatusHistory 
 // Sync related models
 const { SyncLog, initSyncLog, associateSyncLog } = require('./SyncLog');
 
+// Payment related models
+const { Payment, initPayment, associatePayment } = require('./Payment');
+const { PayTRTransaction, initPayTRTransaction, associatePayTRTransaction } = require('./PayTRTransaction');
+
 let modelsInitialized = false;
 
 // Initialize all models
@@ -75,6 +79,10 @@ const initModels = () => {
 
     // Initialize sync models
     initSyncLog();
+
+    // Initialize payment models
+    initPayment();
+    initPayTRTransaction();
     
     modelsInitialized = true;
     console.log('All models initialized successfully');
@@ -119,6 +127,10 @@ const associateModels = () => {
 
     // Associate sync models
     associateSyncLog();
+
+    // Associate payment models
+    associatePayment();
+    associatePayTRTransaction();
     
     console.log('All model associations created successfully');
   } catch (error) {
@@ -184,5 +196,9 @@ module.exports = {
   OrderStatusHistory,
   
   // Sync related models
-  SyncLog
+  SyncLog,
+  
+  // Payment related models
+  Payment,
+  PayTRTransaction
 };
