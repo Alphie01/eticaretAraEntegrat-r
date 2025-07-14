@@ -65,10 +65,20 @@ router.get("/", protect, async (req, res) => {
       createdAt: key.created_at,
     }));
 
+    const marketplaceList = await MarketplaceConfiguration.findAll({
+      include: [
+        {
+          model: MarketplaceCredentialField,
+          as: "credentialFields", // bu `hasMany()` içindeki `as` ile aynı olmalı
+        },
+      ],
+    });
+
     res.status(200).json({
       success: true,
       data: {
         activeMarketplaces,
+        allMarketplaces: marketplaceList,
         configurations: marketplaceConfigs,
         totalActive: activeMarketplaces.length,
         message:
