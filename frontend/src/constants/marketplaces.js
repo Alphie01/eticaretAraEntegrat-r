@@ -43,11 +43,9 @@ export const MARKETPLACE_CONFIGS = {
     name: "Hepsiburada",
     logo: "🏪",
     color: "#ff6000",
-    description: "Teknoloji ve genel ürün kategorileri",
+    description: "Teknoloji ve genel ürün kategorileri (API bilgileri sistem yöneticisi tarafından yapılandırılır)",
     credentials: [
-      { key: "username", label: "Username", type: "text", required: true },
-      { key: "password", label: "Password", type: "password", required: true },
-      { key: "merchantId", label: "Merchant ID", type: "text", required: false },
+      { key: "merchantId", label: "Merchant ID", type: "text", required: true },
     ],
   },
   amazon: {

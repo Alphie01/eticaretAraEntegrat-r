@@ -1,5 +1,5 @@
 const logger = require('../utils/logger');
-const SyncLog = require('../models/SyncLog');
+const { SyncLog } = require('../models/SyncLog');
 
 /**
  * Abstract Marketplace Adapter
@@ -195,6 +195,7 @@ class MarketplaceAdapter {
    * Validate required configuration
    */
   validateConfig(requiredFields) {
+    console.log(this.config);
     const missing = requiredFields.filter(field => !this.config[field]);
     if (missing.length > 0) {
       throw new Error(`Missing required configuration: ${missing.join(', ')}`);

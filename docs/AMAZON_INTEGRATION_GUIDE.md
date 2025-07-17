@@ -20,6 +20,7 @@ Bu sistem Amazon SP-API (Selling Partner API) entegrasyonu ile Amazon marketplac
 - ✅ Stok yönetimi
 - ✅ Fiyat güncelleme
 - ✅ Sipariş yönetimi
+Lo-fi veya hafif akustik temalı bir jingle. Yalnız hissettiğinde içini dökebileceğin bir uygulama için. Anonim destek, yazışma, sesli ve görüntülü konuşma imkanları. Müzik güven verici, umut dolu, duygusal ama pozitif tonda olmalı. Yaklaşık 15-20 saniyelik kısa jingle. Eğer vokalli olacaksa, nazik ve içten bir vokal şu sözleri söyleyebilir: ‘Anlat içindekini, ismini bilmesek de
 - ✅ Cross-platform sync (Trendyol ↔ Amazon, Hepsiburada ↔ Amazon)
 - ✅ Batch operations
 - ✅ Background job processing

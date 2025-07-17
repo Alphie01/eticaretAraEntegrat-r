@@ -414,7 +414,7 @@ function Marketplaces() {
   });
 
   // Use marketplace configurations from database instead of constants
-  const supportedMarketplaces = configurationsData?.data || [];
+  const supportedMarketplaces = configurationsData?.data?.data || [];
   
   // Debug logging for marketplace configurations
   console.log("🔍 Marketplace Configurations Debug:", {
@@ -433,7 +433,8 @@ function Marketplaces() {
 
       // The API returns data in this structure:
       // { success: true, data: [...], configurations: [...], marketplaces: [...] }
-      if (marketplacesData?.data) {
+      // If there's an auth error, marketplacesData will be undefined, but we still want to show marketplaces
+      if (marketplacesData?.data && !marketplacesError) {
         // First try to get credentials from the main data array
         if (Array.isArray(marketplacesData.data)) {
           userCredentials = marketplacesData.data.find(
@@ -678,15 +679,13 @@ function Marketplaces() {
     );
   }
 
-  // Error state
-  if (marketplacesError || configurationsError) {
+  // Error state - only block if configurations error (critical)
+  // Marketplace error (like auth) shouldn't block the UI
+  if (configurationsError) {
     return (
       <Box className="fade-in">
         <Alert severity="error">
-          {configurationsError
-            ? "Pazaryeri konfigürasyonları yüklenirken hata oluştu."
-            : "Pazaryeri bilgileri yüklenirken hata oluştu."}
-          Lütfen sayfayı yenileyin.
+          Pazaryeri konfigürasyonları yüklenirken hata oluştu. Lütfen sayfayı yenileyin.
         </Alert>
       </Box>
     );
@@ -694,6 +693,14 @@ function Marketplaces() {
 
   return (
     <Box className="fade-in">
+      {/* Auth Error Warning */}
+      {marketplacesError && (
+        <Alert severity="warning" sx={{ mb: 4 }}>
+          Pazaryeri bilgilerinize erişilemiyor. Kimlik bilgilerinizi görmek için 
+          <strong> giriş yapın</strong>. Yine de pazaryeri kimlik bilgilerini ekleyebilirsiniz.
+        </Alert>
+      )}
+
       {/* Header */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
@@ -702,7 +709,6 @@ function Marketplaces() {
         <Typography variant="body1" color="text.secondary">
           E-ticaret platformlarınızı yönetin ve kimlik bilgilerinizi
           yapılandırın
-          {localStorage.getItem("token")}
         </Typography>
       </Box>
 
@@ -780,7 +786,7 @@ function Marketplaces() {
       </Grid>
 
       {/* Alerts */}
-      {configuredCount === 0 && (
+      {configurationsData === 0 && (
         <Alert severity="info" sx={{ mb: 4 }}>
           Henüz hiçbir pazaryeri yapılandırılmamış. Başlamak için pazaryeri
           kartlarındaki "Kimlik Bilgilerini Ekle" butonuna tıklayın.

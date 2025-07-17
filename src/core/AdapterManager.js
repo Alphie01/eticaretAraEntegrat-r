@@ -45,7 +45,7 @@ class AdapterManager {
     }
     
     // Check Hepsiburada
-    if (process.env.HEPSIBURADA_USERNAME && process.env.HEPSIBURADA_PASSWORD && process.env.HEPSIBURADA_MERCHANT_ID) {
+    if (process.env.HEPSIBURADA_USERNAME && process.env.HEPSIBURADA_PASSWORD) {
       enabled.push('hepsiburada');
       logger.info('Hepsiburada integration enabled');
     } else {

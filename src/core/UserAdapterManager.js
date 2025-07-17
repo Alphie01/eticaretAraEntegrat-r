@@ -43,13 +43,15 @@ class UserAdapterManager {
         ],
       });
 
-      console.log("Marketplace accounts:", marketplaceAccounts);
       // Her marketplace için adapter oluştur
       for (const account of marketplaceAccounts) {
         if (account.marketplaceCredentials) {
           await this.initializeAdapter(account.marketplaceCredentials);
         }
       }
+
+      // Hepsiburada için özel kontrol - environment'dan API credentials'ları al
+      await this.initializeHepsiburadaIfAvailable();
 
       this.initialized = true;
       logger.info(
@@ -58,6 +60,54 @@ class UserAdapterManager {
     } catch (error) {
       logger.error(
         `Failed to initialize adapters for user ${this.userId}:`,
+        error
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Sadece belirli bir marketplace için adapter başlat
+   */
+  async initializeSpecificMarketplace(targetMarketplace) {
+    try {
+      logger.info(`Initializing adapter for specific marketplace: ${targetMarketplace} for user ${this.userId}`);
+
+      // Belirli marketplace'e ait account'ı çek
+      const marketplaceAccount = await UserMarketplaceAccount.findOne({
+        where: {
+          user_id: this.userId,
+          marketplace: targetMarketplace,
+          is_active: true,
+        },
+        include: [
+          {
+            model: UserMarketplace,
+            as: "marketplaceCredentials",
+            where: {
+              api_key: { [require("sequelize").Op.ne]: null }, // Only accounts with credentials
+            },
+            required: true,
+          },
+        ],
+      });
+
+      if (marketplaceAccount && marketplaceAccount.marketplaceCredentials) {
+        await this.initializeAdapter(marketplaceAccount.marketplaceCredentials);
+      }
+
+      // Hepsiburada için özel kontrol (eğer hedef marketplace Hepsiburada ise)
+      if (targetMarketplace === 'hepsiburada') {
+        await this.initializeHepsiburadaIfAvailable();
+      }
+
+      this.initialized = true;
+      logger.info(
+        `Initialized adapter for ${targetMarketplace} for user ${this.userId}`
+      );
+    } catch (error) {
+      logger.error(
+        `Failed to initialize adapter for ${targetMarketplace} for user ${this.userId}:`,
         error
       );
       throw error;
@@ -83,7 +133,6 @@ class UserAdapterManager {
       const marketplace = marketplaceAccount.marketplace;
       const credentials = userMarketplace.getDecryptedCredentials();
       credentials.marketplace = marketplace; // Add marketplace to credentials
-
 
       // .env'den genel config'leri al
       const envConfig = this.getEnvConfig(marketplace);
@@ -148,6 +197,89 @@ class UserAdapterManager {
   }
 
   /**
+   * Hepsiburada için özel initialization - environment'dan API credentials, user'dan merchantId
+   */
+  async initializeHepsiburadaIfAvailable() {
+    try {
+      // Environment'da Hepsiburada API credentials'ı var mı kontrol et
+      if (
+        !process.env.HEPSIBURADA_USERNAME ||
+        !process.env.HEPSIBURADA_PASSWORD
+      ) {
+        logger.debug(
+          "Hepsiburada API credentials not found in environment variables"
+        );
+        return;
+      }
+
+      // Bu marketplace için zaten adapter var mı kontrol et
+      if (this.adapters.has("hepsiburada")) {
+        logger.debug("Hepsiburada adapter already initialized");
+        return;
+      }
+
+      // Kullanıcının merchantId'si var mı kontrol et
+      const hepsiburadaAccount = await UserMarketplaceAccount.findOne({
+        where: {
+          user_id: this.userId,
+          marketplace: "hepsiburada",
+        },
+        include: [
+          {
+            model: UserMarketplace,
+            as: "marketplaceCredentials",
+          },
+        ],
+      });
+      console.log("Hepsiburada account:", hepsiburadaAccount);
+      if (
+        !hepsiburadaAccount ||
+        !hepsiburadaAccount.marketplaceCredentials ||
+        !hepsiburadaAccount.marketplaceCredentials.merchant_id
+      ) {
+        logger.debug(`No Hepsiburada merchantId found for user ${this.userId}`);
+        return;
+      }
+
+      // Hepsiburada adapter'ını başlat
+      const credentials =
+        hepsiburadaAccount.marketplaceCredentials.getDecryptedCredentials();
+      const envConfig = this.getEnvConfig("hepsiburada");
+
+      const adapterConfig = {
+        ...envConfig,
+        username: process.env.HEPSIBURADA_USERNAME,
+        password: process.env.HEPSIBURADA_PASSWORD,
+        merchantId: credentials.merchantId,
+      };
+
+      const adapter = new HepsiburadaAdapter(adapterConfig);
+
+      // Adapter'ı test et
+      await adapter.authenticate({
+        username: process.env.HEPSIBURADA_USERNAME,
+        password: process.env.HEPSIBURADA_PASSWORD,
+        merchantId: credentials.merchantId,
+      });
+
+      this.adapters.set("hepsiburada", adapter);
+
+      // Son kullanım tarihini güncelle
+      hepsiburadaAccount.last_used_at = new Date();
+      await hepsiburadaAccount.save();
+
+      logger.info(
+        `Successfully initialized Hepsiburada adapter for user ${this.userId} using environment API credentials and user merchantId`
+      );
+    } catch (error) {
+      logger.error(
+        `❌ Failed to initialize Hepsiburada adapter for user ${this.userId}: ${error.message}`
+      );
+      console.error(error); // ✅ Tam hatayı terminalde göster
+    }
+  }
+
+  /**
    * Environment variables'dan marketplace genel config'lerini al
    */
   getEnvConfig(marketplace) {
@@ -167,7 +299,7 @@ class UserAdapterManager {
       case "hepsiburada":
         return {
           ...baseConfig,
-          baseUrl: "https://oms-external-sit.hepsiburada.com",
+          baseUrl: "https://mpop-sit.hepsiburada.com",
           environment: process.env.HEPSIBURADA_ENVIRONMENT || "production",
         };
       case "amazon":
@@ -218,7 +350,7 @@ class UserAdapterManager {
   getMarketplaceBaseUrl(marketplace) {
     const urls = {
       trendyol: "https://apigw.trendyol.com",
-      hepsiburada: "https://oms-external-sit.hepsiburada.com",
+      hepsiburada: "https://mpop-sit.hepsiburada.com",
       amazon: "https://mws.amazonservices.com",
       n11: "https://api.n11.com",
       shopify: "https://admin.shopify.com",
@@ -254,6 +386,8 @@ class UserAdapterManager {
    * Kullanıcının aktif marketplace'lerini listele
    */
   getActiveMarketplaces() {
+    console.log(this.adapters.keys());
+
     return Array.from(this.adapters.keys());
   }
 

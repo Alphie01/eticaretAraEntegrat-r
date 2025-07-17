@@ -74,31 +74,27 @@ async function getUserTrendyolCredentials(userId) {
  * @returns {Object|null} - Hepsiburada credentials objesi veya null
  */
 async function getUserHepsiburadaCredentials(userId) {
+  // API credentials (username, password) env'den alınır
+  if (!process.env.HEPSIBURADA_USERNAME || !process.env.HEPSIBURADA_PASSWORD) {
+    logger.warn(`Hepsiburada API credentials not found in environment variables`);
+    return null;
+  }
+
+  // Kullanıcıya özel merchantId veritabanından alınır
   const userCredentials = await getUserMarketplaceCredentials(userId, 'hepsiburada');
   
-  if (userCredentials && userCredentials.username && userCredentials.password && userCredentials.merchantId) {
-    logger.info(`Using user's own Hepsiburada credentials for user ${userId}`);
-    return {
-      username: userCredentials.username,
-      password: userCredentials.password,
-      merchantId: userCredentials.merchantId,
-      source: 'user'
-    };
+  if (!userCredentials || !userCredentials.merchantId) {
+    logger.warn(`Hepsiburada merchantId not found for user ${userId}`);
+    return null;
   }
 
-  // Fallback to env
-  if (process.env.HEPSIBURADA_USERNAME && process.env.HEPSIBURADA_PASSWORD && process.env.HEPSIBURADA_MERCHANT_ID) {
-    logger.info(`Using environment Hepsiburada credentials for user ${userId}`);
-    return {
-      username: process.env.HEPSIBURADA_USERNAME,
-      password: process.env.HEPSIBURADA_PASSWORD,
-      merchantId: process.env.HEPSIBURADA_MERCHANT_ID,
-      source: 'environment'
-    };
-  }
-
-  logger.warn(`No Hepsiburada credentials available for user ${userId}`);
-  return null;
+  logger.info(`Using Hepsiburada credentials for user ${userId}: API from env, merchantId from user data`);
+  return {
+    username: process.env.HEPSIBURADA_USERNAME,
+    password: process.env.HEPSIBURADA_PASSWORD,
+    merchantId: userCredentials.merchantId,
+    source: 'hybrid'
+  };
 }
 
 /**

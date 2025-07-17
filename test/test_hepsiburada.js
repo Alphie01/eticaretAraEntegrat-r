@@ -1,6 +1,6 @@
 require('dotenv').config();
-const HepsiburadaAdapter = require('./src/adapters/HepsiburadaAdapter');
-const AdapterManager = require('./src/core/AdapterManager');
+const HepsiburadaAdapter = require('../src/adapters/HepsiburadaAdapter');
+const AdapterManager = require('../src/core/AdapterManager');
 
 async function testHepsiburadaIntegration() {
   console.log('🔧 Hepsiburada Entegrasyonu Test Ediliyor...\n');

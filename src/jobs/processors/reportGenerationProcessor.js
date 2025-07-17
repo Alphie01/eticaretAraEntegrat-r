@@ -1,6 +1,6 @@
 const Product = require('../../models/Product');
 const Order = require('../../models/Order');
-const SyncLog = require('../../models/SyncLog');
+const { SyncLog } = require('../../models/SyncLog');
 const logger = require('../../utils/logger');
 const fs = require('fs').promises;
 const path = require('path');

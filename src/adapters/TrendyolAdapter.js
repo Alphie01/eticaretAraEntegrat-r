@@ -1,6 +1,8 @@
 const axios = require("axios");
 const MarketplaceAdapter = require("../core/MarketplaceAdapter");
 const logger = require("../utils/logger");
+const { SyncLog } = require("../models/SyncLog");
+const { UserMarketplaceAccount } = require("../models/UserMarketplaceAccount");
 
 class TrendyolAdapter extends MarketplaceAdapter {
   constructor(config) {
@@ -118,12 +120,13 @@ class TrendyolAdapter extends MarketplaceAdapter {
     }
   }
 
-  async getProducts(params = {}, isFullFetch = false) {
+  async getProducts(params = {}, isFullFetch = false, userID = null) {
     try {
       let { page = 0, size = 50, approved = true, barcode } = params;
       let products = [];
       let totalPages = 0;
-
+      const startTime = Date.now(); // ⏱️ Başlangıç zamanı
+      console.log("Fetching products with params:",params);
       // ✅ Sadece ilk sayfayı çek (isFullFetch = false ise)
       if (!isFullFetch) {
         const response = await this.axiosInstance.get(
@@ -134,6 +137,35 @@ class TrendyolAdapter extends MarketplaceAdapter {
         );
 
         const content = response.data?.content || [];
+
+        const endTime = Date.now(); // ⏱️ Bitiş zamanı
+        const executionTimeMs = endTime - startTime;
+
+        // Basit fetch loglaması
+        await SyncLog.create({
+          user_id: userID,
+          operation: "product_sync",
+          marketplace: "trendyol",
+          entity: "product",
+          entity_id: 123456,
+          entity_type: "product_variant",
+          status: "success",
+          direction: "import",
+          is_bulk_operation: false,
+          execution_time_ms: executionTimeMs,
+          retry_count: 0,
+          max_retries: 1,
+          started_at: new Date(startTime),
+          completed_at: new Date(endTime),
+          total_items: content.length,
+          processed_items: content.length,
+          successful_items: content.length,
+          failed_items: 0,
+          error_message: null,
+          triggered_by: "manual",
+          sync_mode: "selective",
+          metadata: JSON.stringify({ note: "Tek sayfalık ürün çekimi" }),
+        });
 
         return {
           products: content,
@@ -156,7 +188,6 @@ class TrendyolAdapter extends MarketplaceAdapter {
 
         const content = response.data?.content || [];
 
-        // Veri kalmadıysa çık
         if (content.length === 0) {
           fetchUntilLastProduct = false;
           totalPages = response.data?.totalPages || page + 1;
@@ -166,6 +197,53 @@ class TrendyolAdapter extends MarketplaceAdapter {
         products = products.concat(content);
         page++;
       }
+
+      console.log("product length:", products.length);
+      const endTime = Date.now(); // ⏱️ Bitiş zamanı
+      const executionTimeMs = endTime - startTime;
+
+      const syncLog = await SyncLog.create({
+        user_id: userID,
+        operation: "product_sync",
+        marketplace: "trendyol",
+        entity: "product",
+        entity_id: 123456,
+        entity_type: "product_variant",
+        status: "success",
+        direction: "import",
+        is_bulk_operation: true,
+        execution_time_ms: executionTimeMs,
+        retry_count: 0,
+        max_retries: totalPages,
+        started_at: new Date(startTime),
+        completed_at: new Date(endTime),
+        total_items: products.length,
+        processed_items: products.length,
+        successful_items: products.length,
+        failed_items: 0,
+        error_message: null,
+        triggered_by: "manual",
+        sync_mode: "full",
+        metadata: JSON.stringify({ note: "Tüm ürünler senkronize edildi" }),
+      });
+
+      // Trigger yerine manuel update:
+      if (syncLog.completed_at && syncLog.operation === "product_sync") {
+        await UserMarketplaceAccount.update(
+          {
+            last_sync_date: syncLog.completed_at,
+            total_products: syncLog.total_items,
+          },
+          {
+            where: {
+              user_id: syncLog.user_id,
+              marketplace: syncLog.marketplace,
+            },
+          }
+        );
+      }
+
+      
 
       return {
         products: products,
@@ -291,8 +369,8 @@ class TrendyolAdapter extends MarketplaceAdapter {
     }
   }
 
-  async getOrders(params = {}) {
-    console.log("Fetching orders with params:");
+  async getOrders(params = {}, userID = null) {
+    
     /* try {
 
       const {
@@ -403,11 +481,64 @@ class TrendyolAdapter extends MarketplaceAdapter {
     } */
 
     try {
-      var response = await this.axiosInstance.get(`/integration/order/sellers/${this.supplierId}/orders`);
-      
-      return { success: true , data: response.data };
+      const startTime = Date.now(); // ⏱️ Başlangıç zamanı
+      var response = await this.axiosInstance.get(
+        `/integration/order/sellers/${this.supplierId}/orders`
+      );
+
+      const endTime = Date.now(); // ⏱️ Bitiş zamanı
+      const executionTimeMs = endTime - startTime;
+
+      const syncLog = await SyncLog.create({
+        user_id: userID,
+        operation: "order_sync",
+        marketplace: "trendyol",
+        entity: "order",
+        entity_id: 123456,
+        entity_type: "order",
+        status: "success",
+        direction: "import",
+        is_bulk_operation: true,
+        execution_time_ms: executionTimeMs,
+        retry_count: 0,
+        max_retries: response.data.page,
+        started_at: new Date(startTime),
+        completed_at: new Date(endTime),
+        total_items: response.data.content.length,
+        processed_items: response.data.content.length,
+        successful_items: response.data.content.length,
+        failed_items: 0,
+        error_message: null,
+        triggered_by: "manual",
+        sync_mode: "full",
+        metadata: JSON.stringify({ note: "Tüm ürünler senkronize edildi" }),
+      });
+
+      // Trigger yerine manuel update:
+      if (syncLog.completed_at && syncLog.operation === "product_sync") {
+        await UserMarketplaceAccount.update(
+          {
+            last_sync_date: syncLog.completed_at,
+            total_orders: syncLog.total_items,
+            order_price: 0,
+          },
+          {
+            where: {
+              user_id: syncLog.user_id,
+              marketplace: syncLog.marketplace,
+            },
+          }
+        );
+      }
+
+      return {
+        orders: response.data.content || [],
+        totalElements: response.data.totalElements,
+        totalPages: response.data.totalPages,
+        page: response.data.page,
+      };
     } catch (error) {
-      this.handleApiError(error, "DELETE_PRODUCT");
+      this.handleApiError(error, "GET_ORDERS");
     }
   }
 

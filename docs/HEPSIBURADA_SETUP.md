@@ -25,7 +25,7 @@ node test_hepsiburada.js
 - **Ürün Yönetimi**: Listeleme, oluşturma, güncelleme
 - **Stok & Fiyat**: Toplu güncellemeler
 - **Sipariş Yönetimi**: Sipariş takibi ve durum güncelleme
-- **OAuth2 Authentication**: Otomatik token yönetimi
+- **Basic Authentication**: Username/Password tabanlı kimlik doğrulama
 - **Rate Limiting**: 60 istek/dakika
 - **Error Handling**: Kapsamlı hata yönetimi
 

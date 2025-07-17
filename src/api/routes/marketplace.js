@@ -23,16 +23,19 @@ const {
 const { Order } = require("../../models/Order");
 const { ProductMarketplace } = require("../../models/ProductMarketplace");
 const { connectDB, getSequelize } = require("../../config/database");
+const { SyncLog } = require("../../models/SyncLog");
 const router = express.Router();
 
 // Cache for user adapter managers to avoid recreating them
 const userAdapterManagers = new Map();
 
 // Helper function to get or create user adapter manager
-async function getUserAdapterManager(userId) {
+async function getUserAdapterManager(userId, selectedMarketplace = null) {
   if (!userAdapterManagers.has(userId)) {
     const manager = new UserAdapterManager(userId);
+
     await manager.initialize();
+
     userAdapterManagers.set(userId, manager);
   }
   return userAdapterManagers.get(userId);
@@ -46,7 +49,6 @@ router.get("/", protect, async (req, res) => {
     const manager = await getUserAdapterManager(req.user.id);
     const activeMarketplaces = manager.getActiveMarketplaces();
 
-    console.log("Active Marketplaces:", activeMarketplaces);
     // Get user's marketplace keys for status info
     const userKeys = await UserMarketplaceKeys.findAll({
       where: { user_id: req.user.id },
@@ -104,15 +106,8 @@ router.post("/:marketplace", protect, async (req, res) => {
     const { marketplace } = req.params;
     const credentials = req.body;
 
-    console.log(req.user.id);
-    console.log(credentials);
-    console.log(marketplace);
-    console.log("--------");
-    const manager = await getUserAdapterManager(req.user.id);
-    console.log(manager);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
     await manager.addMarketplace(marketplace, credentials);
-    console.log("--------");
-    console.log(manager);
 
     logger.info(`Marketplace added: ${marketplace} for user ${req.user.email}`);
     res.status(201).json({
@@ -136,11 +131,7 @@ router.put("/:marketplace", protect, async (req, res) => {
     const { marketplace } = req.params;
     const credentials = req.body;
 
-    console.log(req.user.id);
-    console.log(credentials);
-    console.log(marketplace);
-    console.log("--------");
-    const manager = await getUserAdapterManager(req.user.id);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
     await manager.updateMarketplace(marketplace, credentials);
 
     logger.info(
@@ -166,7 +157,7 @@ router.get("/:marketplace/test", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
 
-    const manager = await getUserAdapterManager(req.user.id);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
 
     if (!manager.hasMarketplace(marketplace)) {
       return res.status(404).json({
@@ -210,7 +201,7 @@ router.post("/:marketplace/test", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
 
-    const manager = await getUserAdapterManager(req.user.id);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
 
     if (!manager.hasMarketplace(marketplace)) {
       return res.status(404).json({
@@ -254,15 +245,20 @@ router.get("/:marketplace/products", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
     const { page = 0, limit = 50, ...otherParams } = req.query;
-
-    const manager = await getUserAdapterManager(req.user.id);
+    console.log("Fetching products for marketplace:", marketplace);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
     const adapter = manager.getAdapter(marketplace);
 
-    const result = await adapter.getProducts({
-      page: parseInt(page),
-      size: parseInt(limit),
-      ...otherParams,
-    });
+    /* console.log("Fetching products with params:", adapter); */
+    const result = await adapter.getProducts(
+      {
+        page: parseInt(page),
+        size: parseInt(limit),
+        ...otherParams,
+      },
+      (isFullFetch = true), // Force full fetch for sync,
+      (userID = req.user.id)
+    );
 
     res.status(200).json({
       success: true,
@@ -286,7 +282,7 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
     const { marketplace } = req.params;
     const { page = 0, limit = 50, ...otherParams } = req.query;
 
-    const manager = await getUserAdapterManager(req.user.id);
+    const manager = await getUserAdapterManager(req.user.id, marketplace);
     const adapter = manager.getAdapter(marketplace);
 
     const result = await adapter.getProducts(
@@ -295,9 +291,9 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
         size: parseInt(limit),
         ...otherParams,
       },
-      (isFullFetch = true) // Force full fetch for sync
+      (isFullFetch = true), // Force full fetch for sync,
+      (userID = req.user.id)
     );
-
     var insertedProductContentIds = [];
 
     for (const element of result.products) {
@@ -322,8 +318,6 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
 
         insertImagesForProduct(element.images, s.id);
 
-        console.log(s.id);
-
         insertMarketplacesAndVariant(element, "Main", s.id, marketplace);
 
         insertedProductContentIds.push(element.productContentId);
@@ -331,7 +325,7 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
         const productId = await Product.findOne({
           where: { productContentId: element.productContentId },
         });
-        console.log("productVariantId", productId.id);
+
         var productVariantId = await ProductVariant.findOne({
           where: { productCode: element.productCode },
         });
@@ -361,7 +355,6 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
               where: { id: productVariantId.id },
             }
           );
-          console.log("updated");
         }
       }
     }
@@ -482,11 +475,14 @@ router.get("/:marketplace/orders", protect, async (req, res) => {
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
 
-    const result = await adapter.getOrders({
-      page: parseInt(page),
-      size: parseInt(limit),
-      ...otherParams,
-    });
+    const result = await adapter.getOrders(
+      {
+        page: parseInt(page),
+        size: parseInt(limit),
+        ...otherParams,
+      },
+      (userID = req.user.id)
+    );
 
     res.status(200).json({
       success: true,
@@ -591,7 +587,10 @@ router.post("/:marketplace/products", protect, async (req, res) => {
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
 
-    const result = await adapter.createProduct(productData);
+    const result = await adapter.createProduct(
+      productData,
+      (userID = req.user.id)
+    );
 
     logger.info(`Product created in ${marketplace} by user ${req.user.email}`);
     res.status(201).json({
@@ -1134,20 +1133,14 @@ router.post("/configurations/init", async (req, res) => {
         name: "Hepsiburada",
         logo: "🏪",
         color: "#ff6000",
-        description: "Teknoloji ve genel ürün kategorileri",
+        description:
+          "Teknoloji ve genel ürün kategorileri (API bilgileri sistem yöneticisi tarafından yapılandırılır)",
         credentials: [
-          { key: "username", label: "Username", type: "text", required: true },
-          {
-            key: "password",
-            label: "Password",
-            type: "password",
-            required: true,
-          },
           {
             key: "merchantId",
             label: "Merchant ID",
             type: "text",
-            required: false,
+            required: true,
           },
         ],
       },

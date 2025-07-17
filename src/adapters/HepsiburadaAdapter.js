@@ -1,18 +1,24 @@
 const axios = require('axios');
 const MarketplaceAdapter = require('../core/MarketplaceAdapter');
 const logger = require('../utils/logger');
+require('dotenv').config();
 
 class HepsiburadaAdapter extends MarketplaceAdapter {
   constructor(config) {
     super('hepsiburada', config);
     
-    this.baseUrl = config.baseUrl || 'https://mpop.hepsiburada.com';
+    this.baseUrl = config.baseUrl || 'https://mpop-sit.hepsiburada.com';
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
     this.merchantId = config.merchantId;
-    this.username = config.username;
-    this.password = config.password;
-    
+    this.username = config.username || process.env.HEPSIBURADA_USERNAME;
+    this.password = config.password || process.env.HEPSIBURADA_PASSWORD;
+
+    // Config'e de aynı değerleri set edelim ki validateConfig çalışsın
+    this.config.username = this.username;
+    this.config.password = this.password;
+    this.config.merchantId = this.merchantId;
+
     this.validateConfig(['username', 'password', 'merchantId']);
     
     // Hepsiburada specific rate limits
@@ -22,19 +28,21 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       maxRequests: 60 // Hepsiburada allows 60 requests per minute
     };
 
-    this.accessToken = null;
-    this.tokenExpiry = null;
+    // Basic Auth için credentials'ları encode et
+    const basicAuthToken = Buffer.from(`${this.username}:${this.password}`).toString('base64');
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'EticaretEntegrator-Hepsiburada/1.0'
+        'User-Agent': 'castelina_dev',
+        'Authorization': `Basic ${basicAuthToken}`
       }
     });
 
     this.setupInterceptors();
+    this.isAuthenticated = true; // Basic Auth ile hemen authenticate
   }
 
   setupInterceptors() {
@@ -43,14 +51,8 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       async (config) => {
         await this.checkRateLimit();
         
-        // Add authentication token
-        if (this.accessToken && this.isTokenValid()) {
-          config.headers.Authorization = `Bearer ${this.accessToken}`;
-        } else if (!config.url.includes('/oauth2/token')) {
-          // Refresh token if needed (except for token endpoint)
-          await this.authenticate();
-          config.headers.Authorization = `Bearer ${this.accessToken}`;
-        }
+        // Basic Auth header zaten constructor'da set edildi
+        // Ek bir işlem yapılmasına gerek yok
         
         logger.debug(`Hepsiburada API Request: ${config.method?.toUpperCase()} ${config.url}`);
         return config;
@@ -71,39 +73,42 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     );
   }
 
-  isTokenValid() {
-    return this.tokenExpiry && Date.now() < this.tokenExpiry;
-  }
-
   async authenticate(credentials) {
     try {
       if (credentials) {
         this.username = credentials.username;
         this.password = credentials.password;
         this.merchantId = credentials.merchantId;
+        
+        // Basic Auth header'ını güncelle
+        const basicAuthToken = Buffer.from(`${this.username}:${this.password}`).toString('base64');
+        this.axiosInstance.defaults.headers['Authorization'] = `Basic ${basicAuthToken}`;
       }
 
-      const response = await this.axiosInstance.post('/oauth2/token', {
-        grant_type: 'password',
-        username: this.username,
-        password: this.password
-      }, {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+      // Debug bilgileri
+      logger.info(`Hepsiburada Auth Debug - Username: ${this.username?.substring(0, 8)}...`);
+      logger.info(`Hepsiburada Auth Debug - Password: ${this.password ? '***' + this.password.substring(this.password.length-3) : 'not set'}`);
+      logger.info(`Hepsiburada Auth Debug - MerchantId: ${this.merchantId}`);
+      logger.info(`Hepsiburada Auth Debug - Base URL: ${this.baseUrl}`);
       
-      this.accessToken = response.data.access_token;
-      this.tokenExpiry = Date.now() + (response.data.expires_in * 1000) - 60000; // 1 minute buffer
+      // Basic Auth ile test isteği yap
+      const testUrl = `/product/api/products/all-products-of-merchant/${this.merchantId}?limit=1&offset=0`;
+      logger.info(`Hepsiburada Auth Debug - Test URL: ${this.baseUrl}${testUrl}`);
+      
+      const response = await this.axiosInstance.get(testUrl);
+      
       this.isAuthenticated = true;
-      
-      logger.info('Hepsiburada authentication successful');
+      logger.info('Hepsiburada Basic Auth authentication successful');
       return true;
     } catch (error) {
       this.isAuthenticated = false;
-      this.accessToken = null;
-      this.tokenExpiry = null;
-      logger.error('Hepsiburada authentication failed:', error);
+      logger.error('Hepsiburada Basic Auth authentication failed:', error.response?.status, error.response?.statusText);
+      logger.error('Hepsiburada Auth Error Details:', {
+        url: error.config?.url,
+        method: error.config?.method,
+        headers: error.config?.headers ? 'present' : 'missing',
+        data: error.response?.data
+      });
       throw error;
     }
   }
@@ -117,17 +122,17 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
         listingId 
       } = params;
       
-      let url = `/api/product/v1/products/merchant/${this.merchantId}`;
+      let url = `/product/api/products/all-products-of-merchant/${this.merchantId}`;
       const queryParams = { offset, limit };
       
       if (sku) queryParams.sku = sku;
       if (listingId) queryParams.listingId = listingId;
       
       const response = await this.axiosInstance.get(url, { params: queryParams });
-      
+      console.log(response.data);
       return {
-        products: response.data.productList || [],
-        totalCount: response.data.totalCount,
+        products: response.data || [],
+        totalCount: response.data.totalElements,
         offset: response.data.offset,
         limit: response.data.limit
       };
