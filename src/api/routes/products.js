@@ -2,6 +2,7 @@ const express = require('express');
 const { Product } = require('../../models/Product');
 const { protect, authorize } = require('../../middleware/auth');
 const adapterManager = require('../../core/AdapterManager');
+const MultiPlatformProductMatcher = require('../../core/MultiPlatformProductMatcher');
 const logger = require('../../utils/logger');
 
 const router = express.Router();
@@ -566,5 +567,322 @@ router.post('/bulk', protect, async (req, res) => {
     });
   }
 });
+
+// @desc    Match products across all platforms  
+// @route   POST /api/v1/products/match-platforms
+// @access  Private
+router.post('/match-platforms', protect, async (req, res) => {
+  try {
+    const {
+      marketplaces,
+      strictMatching = false,
+      similarityThreshold = 0.85,
+      ignoreBrand = false
+    } = req.body;
+
+    const matcher = new MultiPlatformProductMatcher();
+    
+    logger.info(`Starting multi-platform product matching for user ${req.user.id}`);
+
+    // Ürünleri eşleştir
+    const matchingResults = await matcher.matchAllPlatformProducts(
+      req.user.id,
+      {
+        marketplaces,
+        strictMatching,
+        similarityThreshold,
+        ignoreBrand
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Multi-platform product matching completed',
+      data: matchingResults
+    });
+
+  } catch (error) {
+    logger.error('Multi-platform matching failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Multi-platform product matching failed',
+      details: error.message
+    });
+  }
+});
+
+// @desc    Save matched products to database
+// @route   POST /api/v1/products/match-platforms/save
+// @access  Private  
+router.post('/match-platforms/save', protect, async (req, res) => {
+  try {
+    const {
+      matchingResults,
+      overwriteExisting = false,
+      createMissingCategories = true,
+      saveUnmatched = true
+    } = req.body;
+
+    if (!matchingResults) {
+      return res.status(400).json({
+        success: false,
+        error: 'Matching results are required'
+      });
+    }
+
+    const matcher = new MultiPlatformProductMatcher();
+    
+    logger.info(`Saving matched products to database for user ${req.user.id}`);
+
+    // Eşleştirilen ürünleri veritabanına kaydet
+    const saveResults = await matcher.saveMatchedProductsToDatabase(
+      req.user.id,
+      matchingResults,
+      {
+        overwriteExisting,
+        createMissingCategories
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Matched products saved to database successfully',
+      data: saveResults
+    });
+
+  } catch (error) {
+    logger.error('Saving matched products failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to save matched products to database',
+      details: error.message
+    });
+  }
+});
+
+// @desc    Get platform product matching status
+// @route   GET /api/v1/products/match-platforms/status
+// @access  Private
+router.get('/match-platforms/status', protect, async (req, res) => {
+  try {
+    const matcher = new MultiPlatformProductMatcher();
+    
+    // Kullanıcının mevcut ürünlerini al
+    const existingProducts = await Product.findAll({
+      where: { 
+        user_id: req.user.id,
+        is_active: true 
+      },
+      include: ['marketplaceListings']
+    });
+
+    // Platform başına ürün sayıları
+    const platformCounts = {};
+    const supportedMarketplaces = matcher.getSupportedMarketplaces();
+    
+    for (const marketplace of supportedMarketplaces) {
+      try {
+        const adapter = await adapterManager.getAdapter(req.user.id, marketplace);
+        const productsResponse = await adapter.getProducts({ limit: 1, page: 0 });
+        platformCounts[marketplace] = productsResponse.totalCount || productsResponse.products?.length || 0;
+      } catch (error) {
+        platformCounts[marketplace] = 0;
+      }
+    }
+
+    // Veritabanındaki ürün istatistikleri
+    const dbStats = {
+      totalProducts: existingProducts.length,
+      productsByPlatform: {},
+      unmatchedProducts: 0
+    };
+
+    existingProducts.forEach(product => {
+      if (product.marketplaceListings) {
+        product.marketplaceListings.forEach(listing => {
+          if (!dbStats.productsByPlatform[listing.marketplace]) {
+            dbStats.productsByPlatform[listing.marketplace] = 0;
+          }
+          dbStats.productsByPlatform[listing.marketplace]++;
+        });
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        supportedMarketplaces,
+        platformCounts,
+        databaseStats: dbStats,
+        lastChecked: new Date(),
+        recommendations: generateStatusRecommendations(platformCounts, dbStats)
+      }
+    });
+
+  } catch (error) {
+    logger.error('Get matching status failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get platform matching status',
+      details: error.message
+    });
+  }
+});
+
+// @desc    Match and save products in one operation
+// @route   POST /api/v1/products/match-platforms/auto
+// @access  Private
+router.post('/match-platforms/auto', protect, async (req, res) => {
+  try {
+    const {
+      marketplaces,
+      strictMatching = false,
+      similarityThreshold = 0.85,
+      ignoreBrand = false,
+      overwriteExisting = false,
+      saveUnmatched = true
+    } = req.body;
+
+    const matcher = new MultiPlatformProductMatcher();
+    
+    logger.info(`Starting auto match and save for user ${req.user.id}`);
+
+    // 1. Ürünleri eşleştir
+    const matchingResults = await matcher.matchAllPlatformProducts(
+      req.user.id,
+      {
+        marketplaces,
+        strictMatching,
+        similarityThreshold,
+        ignoreBrand
+      }
+    );
+
+    // 2. Veritabanına kaydet
+    const saveResults = await matcher.saveMatchedProductsToDatabase(
+      req.user.id,
+      matchingResults.matching,
+      {
+        overwriteExisting,
+        createMissingCategories: true
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Auto match and save completed successfully',
+      data: {
+        matching: matchingResults,
+        saving: saveResults,
+        summary: {
+          totalProcessed: matchingResults.summary.totalProducts,
+          productsSaved: saveResults.savedProducts,
+          productsSkipped: saveResults.skippedProducts,
+          errors: saveResults.errors.length,
+          matchRate: matchingResults.summary.matchRate
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Auto match and save failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Auto match and save operation failed',
+      details: error.message
+    });
+  }
+});
+
+// @desc    Get supported marketplaces for matching
+// @route   GET /api/v1/products/match-platforms/marketplaces
+// @access  Private
+router.get('/match-platforms/marketplaces', protect, async (req, res) => {
+  try {
+    const matcher = new MultiPlatformProductMatcher();
+    const supportedMarketplaces = matcher.getSupportedMarketplaces();
+
+    // Her marketplace için bağlantı durumunu kontrol et
+    const marketplaceStatus = {};
+    for (const marketplace of supportedMarketplaces) {
+      try {
+        const adapter = await adapterManager.getAdapter(req.user.id, marketplace);
+        marketplaceStatus[marketplace] = {
+          connected: true,
+          hasCredentials: true
+        };
+      } catch (error) {
+        marketplaceStatus[marketplace] = {
+          connected: false,
+          hasCredentials: false,
+          error: error.message
+        };
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        supportedMarketplaces,
+        marketplaceStatus,
+        connectedCount: Object.values(marketplaceStatus).filter(status => status.connected).length,
+        totalCount: supportedMarketplaces.length
+      }
+    });
+
+  } catch (error) {
+    logger.error('Get supported marketplaces failed:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get supported marketplaces',
+      details: error.message
+    });
+  }
+});
+
+// Helper function for status recommendations
+function generateStatusRecommendations(platformCounts, dbStats) {
+  const recommendations = [];
+
+  // Platform bağlantısı kontrolü
+  const disconnectedPlatforms = Object.entries(platformCounts)
+    .filter(([, count]) => count === 0)
+    .map(([platform]) => platform);
+
+  if (disconnectedPlatforms.length > 0) {
+    recommendations.push({
+      type: 'connect_platforms',
+      priority: 'high',
+      message: `${disconnectedPlatforms.join(', ')} platformlarına bağlanın`,
+      action: 'Configure marketplace credentials'
+    });
+  }
+
+  // Eşleştirme önerisi
+  const totalPlatformProducts = Object.values(platformCounts).reduce((sum, count) => sum + count, 0);
+  const totalDbProducts = dbStats.totalProducts;
+
+  if (totalPlatformProducts > totalDbProducts * 1.2) {
+    recommendations.push({
+      type: 'run_matching',
+      priority: 'medium',
+      message: 'Yeni ürünler tespit edildi, eşleştirme çalıştırın',
+      action: 'POST /api/v1/products/match-platforms/auto'
+    });
+  }
+
+  // Veri kalitesi kontrolü
+  const platformsWithProducts = Object.values(platformCounts).filter(count => count > 0).length;
+  if (platformsWithProducts >= 2 && totalDbProducts === 0) {
+    recommendations.push({
+      type: 'initial_setup',
+      priority: 'high',
+      message: 'İlk ürün eşleştirmenizi yapın',
+      action: 'POST /api/v1/products/match-platforms/auto'
+    });
+  }
+
+  return recommendations;
+}
 
 module.exports = router; 

@@ -1,41 +1,117 @@
-const { getSequelize } = require('../config/database');
+const { getSequelize } = require("../config/database");
 
 // Import model initializers
-const { User, initUser, associateUser } = require('./User');
-const { UserRole, initUserRole, associateUserRole } = require('./UserRole');
-const { Permission, initPermission, associatePermission } = require('./Permission');
-const { RolePermission, initRolePermission, associateRolePermission } = require('./RolePermission');
-const { UserCompany, initUserCompany, associateUserCompany } = require('./UserCompany');
-const { UserMarketplaceAccount, initUserMarketplaceAccount, associateUserMarketplaceAccount } = require('./UserMarketplaceAccount');
-const { UserMarketplaceCredentials, initUserMarketplaceCredentials, associateUserMarketplaceCredentials } = require('./UserMarketplaceCredentials');
-const { UserMarketplaceSettings, initUserMarketplaceSettings, associateUserMarketplaceSettings } = require('./UserMarketplaceSettings');
-const { UserPreferences, initUserPreferences, associateUserPreferences } = require('./UserPreferences');
-const { UserNotificationSettings, initUserNotificationSettings, associateUserNotificationSettings } = require('./UserNotificationSettings');
-const { UserMarketplaceKeys, initUserMarketplaceKeys, associateUserMarketplaceKeys } = require('./UserMarketplaceKeys');
-const { UserMarketplace, initUserMarketplace, associateUserMarketplace } = require('./UserMarketplace');
+const { User, initUser, associateUser } = require("./User");
+const { UserRole, initUserRole, associateUserRole } = require("./UserRole");
+const {
+  Permission,
+  initPermission,
+  associatePermission,
+} = require("./Permission");
+const {
+  RolePermission,
+  initRolePermission,
+  associateRolePermission,
+} = require("./RolePermission");
+const {
+  UserCompany,
+  initUserCompany,
+  associateUserCompany,
+} = require("./UserCompany");
+const {
+  UserMarketplaceAccount,
+  initUserMarketplaceAccount,
+  associateUserMarketplaceAccount,
+} = require("./UserMarketplaceAccount");
+const {
+  UserMarketplaceCredentials,
+  initUserMarketplaceCredentials,
+  associateUserMarketplaceCredentials,
+} = require("./UserMarketplaceCredentials");
+const {
+  UserMarketplaceSettings,
+  initUserMarketplaceSettings,
+  associateUserMarketplaceSettings,
+} = require("./UserMarketplaceSettings");
+const {
+  UserPreferences,
+  initUserPreferences,
+  associateUserPreferences,
+} = require("./UserPreferences");
+const {
+  UserNotificationSettings,
+  initUserNotificationSettings,
+  associateUserNotificationSettings,
+} = require("./UserNotificationSettings");
+const {
+  UserMarketplaceKeys,
+  initUserMarketplaceKeys,
+  associateUserMarketplaceKeys,
+} = require("./UserMarketplaceKeys");
+const {
+  UserMarketplace,
+  initUserMarketplace,
+  associateUserMarketplace,
+} = require("./UserMarketplace");
 
 // Marketplace configuration models
-const { MarketplaceConfiguration, MarketplaceCredentialField, initMarketplaceConfiguration, initMarketplaceCredentialField, associateMarketplaceConfiguration } = require('./MarketplaceConfiguration');
+const {
+  MarketplaceConfiguration,
+  MarketplaceCredentialField,
+  initMarketplaceConfiguration,
+  initMarketplaceCredentialField,
+  associateMarketplaceConfiguration,
+} = require("./MarketplaceConfiguration");
 
 // Product related models
-const { Product, initProduct, associateProduct } = require('./Product');
-const { ProductVariant, initProductVariant, associateProductVariant } = require('./ProductVariant');
-const { ProductImage, initProductImage, associateProductImage } = require('./ProductImage');
-const { ProductMarketplace, initProductMarketplace, associateProductMarketplace } = require('./ProductMarketplace');
-const { ProductCategory, initProductCategory, associateProductCategory } = require('./ProductCategory');
-const { ProductVariantAttribute, initProductVariantAttribute, associateProductVariantAttribute } = require('./ProductVariantAttribute');
+const { Product, initProduct, associateProduct } = require("./Product");
+const {
+  ProductVariant,
+  initProductVariant,
+  associateProductVariant,
+} = require("./ProductVariant");
+const {
+  ProductImage,
+  initProductImage,
+  associateProductImage,
+} = require("./ProductImage");
+const {
+  ProductMarketplace,
+  initProductMarketplace,
+  associateProductMarketplace,
+} = require("./ProductMarketplace");
+const {
+  ProductCategory,
+  initProductCategory,
+  associateProductCategory,
+} = require("./ProductCategory");
+const {
+  ProductVariantAttribute,
+  initProductVariantAttribute,
+  associateProductVariantAttribute,
+} = require("./ProductVariantAttribute");
 
 // Order related models
-const { Order, initOrder, associateOrder } = require('./Order');
-const { OrderItem, initOrderItem, associateOrderItem } = require('./OrderItem');
-const { OrderStatusHistory, initOrderStatusHistory, associateOrderStatusHistory } = require('./OrderStatusHistory');
+const { Order, initOrder, associateOrder } = require("./Order");
+const { OrderItem, initOrderItem, associateOrderItem } = require("./OrderItem");
+const {
+  OrderStatusHistory,
+  initOrderStatusHistory,
+  associateOrderStatusHistory,
+} = require("./OrderStatusHistory");
 
 // Sync related models
-const { SyncLog, initSyncLog, associateSyncLog } = require('./SyncLog');
+const { SyncLog, initSyncLog, associateSyncLog } = require("./SyncLog");
 
 // Payment related models
-const { Payment, initPayment, associatePayment } = require('./Payment');
-const { PayTRTransaction, initPayTRTransaction, associatePayTRTransaction } = require('./PayTRTransaction');
+const { Payment, initPayment, associatePayment } = require("./Payment");
+const {
+  PayTRTransaction,
+  initPayTRTransaction,
+  associatePayTRTransaction,
+} = require("./PayTRTransaction");
+
+const { OwnCategories, initOwnCategories } = require("./ownCategories");
 
 let modelsInitialized = false;
 
@@ -76,6 +152,7 @@ const initModels = () => {
     initOrder();
     initOrderItem();
     initOrderStatusHistory();
+    initOwnCategories();
 
     // Initialize sync models
     initSyncLog();
@@ -83,11 +160,11 @@ const initModels = () => {
     // Initialize payment models
     initPayment();
     initPayTRTransaction();
-    
+
     modelsInitialized = true;
-    console.log('All models initialized successfully');
+    console.log("All models initialized successfully");
   } catch (error) {
-    console.error('Error initializing models:', error);
+    console.error("Error initializing models:", error);
     throw error;
   }
 };
@@ -131,10 +208,10 @@ const associateModels = () => {
     // Associate payment models
     associatePayment();
     associatePayTRTransaction();
-    
-    console.log('All model associations created successfully');
+
+    console.log("All model associations created successfully");
   } catch (error) {
-    console.error('Error creating model associations:', error);
+    console.error("Error creating model associations:", error);
     throw error;
   }
 };
@@ -145,13 +222,16 @@ const setupModels = () => {
     // Check if database connection exists
     const sequelize = getSequelize();
     if (!sequelize) {
-      throw new Error('Database connection not available');
+      throw new Error("Database connection not available");
     }
-    
+
     initModels();
     associateModels();
   } catch (error) {
-    console.error('Cannot setup models without database connection:', error.message);
+    console.error(
+      "Cannot setup models without database connection:",
+      error.message
+    );
     throw error;
   }
 };
@@ -160,10 +240,10 @@ const setupModels = () => {
 module.exports = {
   // Database
   sequelize: getSequelize,
-  
+
   // Setup function
   setupModels,
-  
+
   // User related models
   User,
   UserRole,
@@ -177,11 +257,11 @@ module.exports = {
   UserNotificationSettings,
   UserMarketplaceKeys,
   UserMarketplace,
-  
+
   // Marketplace configuration models
   MarketplaceConfiguration,
   MarketplaceCredentialField,
-  
+
   // Product related models
   Product,
   ProductVariant,
@@ -189,16 +269,19 @@ module.exports = {
   ProductMarketplace,
   ProductCategory,
   ProductVariantAttribute,
-  
+
   // Order related models
   Order,
   OrderItem,
   OrderStatusHistory,
-  
+
   // Sync related models
   SyncLog,
-  
+
+  // Category related models
+  OwnCategories,
+
   // Payment related models
   Payment,
-  PayTRTransaction
+  PayTRTransaction,
 };

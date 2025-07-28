@@ -19,16 +19,18 @@ const {
   Product,
   ProductVariant,
   ProductVariantAttribute,
+  OwnCategories,
 } = require("../../models");
 const { Order } = require("../../models/Order");
 const { ProductMarketplace } = require("../../models/ProductMarketplace");
 const { connectDB, getSequelize } = require("../../config/database");
 const { SyncLog } = require("../../models/SyncLog");
 const router = express.Router();
+const MultiPlatformProductMatcher = require("../../core/MultiPlatformProductMatcher");
 
 // Cache for user adapter managers to avoid recreating them
 const userAdapterManagers = new Map();
-
+const multiplatformProductMatcher = new MultiPlatformProductMatcher();
 // Helper function to get or create user adapter manager
 async function getUserAdapterManager(userId, selectedMarketplace = null) {
   if (!userAdapterManagers.has(userId)) {
@@ -277,6 +279,7 @@ router.get("/:marketplace/products", protect, async (req, res) => {
 // @desc    Get marketplace products
 // @route   GET /api/v1/marketplace/:marketplace/sync
 // @access  Private
+
 router.get("/:marketplace/sync", protect, async (req, res) => {
   try {
     const { marketplace } = req.params;
@@ -291,12 +294,17 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
         size: parseInt(limit),
         ...otherParams,
       },
-      (isFullFetch = true), // Force full fetch for sync,
+      (isFullFetch = false), // Force full fetch for sync,
       (userID = req.user.id)
     );
     var insertedProductContentIds = [];
 
-    for (const element of result.products) {
+    var products = multiplatformProductMatcher.normalizeProducts(
+      result.products,
+      marketplace
+    );
+
+    /*     for (const element of products) {
       const product = await Product.findOne({
         where: { productContentId: element.productContentId },
       });
@@ -357,11 +365,45 @@ router.get("/:marketplace/sync", protect, async (req, res) => {
           );
         }
       }
-    }
+    } */
+
+    /* 
+
+            const startTime = Date.now();
+            const endTime = Date.now(); 
+            const executionTimeMs = endTime - startTime;
+
+            await SyncLog.create({
+              user_id: userID,
+              operation: "product_sync",
+              marketplace: "hepsiburada",
+              entity: "product",
+              entity_id: 123456,
+              entity_type: "product_variant",
+              status: "success",
+              direction: "import",
+              is_bulk_operation: false,
+              execution_time_ms: executionTimeMs,
+              retry_count: 0,
+              max_retries: 1,
+              started_at: new Date(startTime),
+              completed_at: new Date(endTime),
+              total_items: response.data.length,
+              processed_items: response.data.length,
+              successful_items: response.data.length,
+              failed_items: 0,
+              error_message: null,
+              triggered_by: "manual",
+              sync_mode: "selective",
+              metadata: JSON.stringify({ note: "Tek sayfalık ürün çekimi" }),
+            });
+
+      */
 
     res.status(200).json({
       success: true,
-      data: result,
+      //data: result,
+      data: products,
     });
   } catch (error) {
     logger.error("Get marketplace products failed:", error);
@@ -560,7 +602,13 @@ router.get("/:marketplace/categories", protect, async (req, res) => {
     const manager = await getUserAdapterManager(req.user.id);
     const adapter = manager.getAdapter(marketplace);
 
-    const categories = await adapter.getCategories();
+    const categories = await adapter.getCategories({ getAllCategories: false });
+    if (!categories || categories.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: `No categories found for ${marketplace}.`,
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -575,6 +623,123 @@ router.get("/:marketplace/categories", protect, async (req, res) => {
     });
   }
 });
+
+// @desc    Get marketplace categories Sync With Database
+// @route   GET /api/v1/marketplace/:marketplace/categories/sync
+// @access  Private
+router.get("/:marketplace/categories/sync", protect, async (req, res) => {
+  try {
+    const { marketplace } = req.params;
+
+    const manager = await getUserAdapterManager(req.user.id);
+    const adapter = manager.getAdapter(marketplace);
+
+    const categories = await adapter.getCategories({ getAllCategories: false });
+    if (!categories || categories.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: `No categories found for ${marketplace}.`,
+      });
+    }
+
+    // Sync categories with the local database
+    var normalizedCategories = multiplatformProductMatcher.normalizeCategory(
+      categories,
+      marketplace
+    );
+    await syncCategoriesWithDatabase(normalizedCategories, marketplace);
+
+    res.status(200).json({
+      success: true,
+      //data: categories,
+      data: normalizedCategories,
+    });
+  } catch (error) {
+    logger.error("Get marketplace categories failed:", error);
+    res.status(500).json({
+      success: false,
+      error:
+        error.message || "Server error while fetching marketplace categories",
+    });
+  }
+});
+
+syncCategoriesWithDatabase = async (categories, marketplace) => {
+  try {
+    if (!categories || !Array.isArray(categories)) {
+      logger.warn(
+        "Invalid categories data provided to syncCategoriesWithDatabase"
+      );
+      return;
+    }
+
+    logger.info(
+      `Syncing ${categories.length} categories for marketplace: ${marketplace}`
+    );
+
+    for (const category of categories) {
+      // Validate category data before insertion
+      if (!category || !category.categoryId || !category.name) {
+        logger.warn("Skipping invalid category:", category);
+        continue;
+      }
+
+      try {
+        console.log("Processing category:", category);
+        
+        // Model'in düzgün initialize edildiğini kontrol et
+        if (!OwnCategories.sequelize) {
+          logger.error("OwnCategories model is not properly initialized");
+          throw new Error("OwnCategories model is not properly initialized");
+        }
+        
+        // Check if category already exists
+        const existingCategory = await OwnCategories.findOne({
+          where: {
+            categoryId: category.categoryId,
+            marketplace: marketplace,
+          },
+        });
+
+        if (existingCategory) {
+          logger.debug(
+            `Category ${category.categoryId} already exists for ${marketplace}, skipping`
+          );
+          continue;
+        }
+
+        var categoryData = {
+          categoryId: category.categoryId,
+          name: category.name,
+          slug: category.slug || `${marketplace}-${category.categoryId}`,
+          description: category.description || "",
+          isActive: category.isActive !== undefined ? category.isActive : true,
+          marketplace: marketplace,
+          displayName: category.displayName || category.name,
+          parentId: category.parentId || null,
+        };
+
+        console.log("Category Data:", categoryData);
+
+        await OwnCategories.create(categoryData);
+
+        logger.debug(
+          `Created category: ${category.name} (ID: ${category.categoryId})`
+        );
+      } catch (categoryError) {
+        logger.error(categoryError);
+        // Continue with next category instead of failing completely
+      }
+    }
+
+    logger.info(
+      `Successfully synced categories for marketplace: ${marketplace}`
+    );
+  } catch (error) {
+    logger.error("Sync categories with database failed:", error);
+    throw error; // Re-throw to be caught by the route handler
+  }
+};
 
 // @desc    Create product in marketplace
 // @route   POST /api/v1/marketplace/:marketplace/products
@@ -848,6 +1013,30 @@ router.get("/stats", protect, async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Server error while fetching adapter statistics",
+    });
+  }
+});
+
+// @desc    Get Marketplace Categories
+// @route   GET /api/v1/marketplace/:marketplace/categories
+// @access  Private
+router.get("/:marketplace/categories", protect, async (req, res) => {
+  try {
+    const { marketplace } = req.params;
+    const manager = await getUserAdapterManager(req.user.id);
+    const adapter = manager.getAdapter(marketplace);
+
+    const categories = await adapter.getCategories();
+
+    res.status(200).json({
+      success: true,
+      data: categories,
+    });
+  } catch (error) {
+    logger.error("Get marketplace categories failed:", error);
+    res.status(500).json({
+      success: false,
+      error: "Server error while fetching marketplace categories",
     });
   }
 });

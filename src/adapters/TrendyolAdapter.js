@@ -566,7 +566,7 @@ class TrendyolAdapter extends MarketplaceAdapter {
   async getCategories() {
     try {
       const response = await this.axiosInstance.get(
-        "/sapigw/product-categories"
+        "/integration/product/product-categories"
       );
 
       return response.data.categories || [];

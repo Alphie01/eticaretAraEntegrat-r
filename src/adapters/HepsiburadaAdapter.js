@@ -1,13 +1,14 @@
-const axios = require('axios');
-const MarketplaceAdapter = require('../core/MarketplaceAdapter');
-const logger = require('../utils/logger');
-require('dotenv').config();
+const axios = require("axios");
+const MarketplaceAdapter = require("../core/MarketplaceAdapter");
+const logger = require("../utils/logger");
+const SyncLog = require("../models/SyncLog");
+require("dotenv").config();
 
 class HepsiburadaAdapter extends MarketplaceAdapter {
   constructor(config) {
-    super('hepsiburada', config);
-    
-    this.baseUrl = config.baseUrl || 'https://mpop-sit.hepsiburada.com';
+    super("hepsiburada", config);
+
+    this.baseUrl = config.baseUrl || "https://mpop-sit.hepsiburada.com";
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
     this.merchantId = config.merchantId;
@@ -19,26 +20,28 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     this.config.password = this.password;
     this.config.merchantId = this.merchantId;
 
-    this.validateConfig(['username', 'password', 'merchantId']);
-    
+    this.validateConfig(["username", "password", "merchantId"]);
+
     // Hepsiburada specific rate limits
     this.rateLimits = {
       requests: 0,
       window: 60000, // 1 minute
-      maxRequests: 60 // Hepsiburada allows 60 requests per minute
+      maxRequests: 60, // Hepsiburada allows 60 requests per minute
     };
 
     // Basic Auth için credentials'ları encode et
-    const basicAuthToken = Buffer.from(`${this.username}:${this.password}`).toString('base64');
+    const basicAuthToken = Buffer.from(
+      `${this.username}:${this.password}`
+    ).toString("base64");
 
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
       headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'castelina_dev',
-        'Authorization': `Basic ${basicAuthToken}`
-      }
+        "Content-Type": "application/json",
+        "User-Agent": "castelina_dev",
+        Authorization: `Basic ${basicAuthToken}`,
+      },
     });
 
     this.setupInterceptors();
@@ -50,11 +53,13 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     this.axiosInstance.interceptors.request.use(
       async (config) => {
         await this.checkRateLimit();
-        
+
         // Basic Auth header zaten constructor'da set edildi
         // Ek bir işlem yapılmasına gerek yok
-        
-        logger.debug(`Hepsiburada API Request: ${config.method?.toUpperCase()} ${config.url}`);
+
+        logger.debug(
+          `Hepsiburada API Request: ${config.method?.toUpperCase()} ${config.url}`
+        );
         return config;
       },
       (error) => Promise.reject(error)
@@ -63,11 +68,13 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     // Response interceptor
     this.axiosInstance.interceptors.response.use(
       (response) => {
-        logger.debug(`Hepsiburada API Response: ${response.status} ${response.config.url}`);
+        logger.debug(
+          `Hepsiburada API Response: ${response.status} ${response.config.url}`
+        );
         return response;
       },
       (error) => {
-        this.handleApiError(error, 'API_CALL');
+        this.handleApiError(error, "API_CALL");
         return Promise.reject(error);
       }
     );
@@ -79,35 +86,48 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
         this.username = credentials.username;
         this.password = credentials.password;
         this.merchantId = credentials.merchantId;
-        
+
         // Basic Auth header'ını güncelle
-        const basicAuthToken = Buffer.from(`${this.username}:${this.password}`).toString('base64');
-        this.axiosInstance.defaults.headers['Authorization'] = `Basic ${basicAuthToken}`;
+        const basicAuthToken = Buffer.from(
+          `${this.username}:${this.password}`
+        ).toString("base64");
+        this.axiosInstance.defaults.headers["Authorization"] =
+          `Basic ${basicAuthToken}`;
       }
 
       // Debug bilgileri
-      logger.info(`Hepsiburada Auth Debug - Username: ${this.username?.substring(0, 8)}...`);
-      logger.info(`Hepsiburada Auth Debug - Password: ${this.password ? '***' + this.password.substring(this.password.length-3) : 'not set'}`);
+      logger.info(
+        `Hepsiburada Auth Debug - Username: ${this.username?.substring(0, 8)}...`
+      );
+      logger.info(
+        `Hepsiburada Auth Debug - Password: ${this.password ? "***" + this.password.substring(this.password.length - 3) : "not set"}`
+      );
       logger.info(`Hepsiburada Auth Debug - MerchantId: ${this.merchantId}`);
       logger.info(`Hepsiburada Auth Debug - Base URL: ${this.baseUrl}`);
-      
+
       // Basic Auth ile test isteği yap
       const testUrl = `/product/api/products/all-products-of-merchant/${this.merchantId}?limit=1&offset=0`;
-      logger.info(`Hepsiburada Auth Debug - Test URL: ${this.baseUrl}${testUrl}`);
-      
+      logger.info(
+        `Hepsiburada Auth Debug - Test URL: ${this.baseUrl}${testUrl}`
+      );
+
       const response = await this.axiosInstance.get(testUrl);
-      
+
       this.isAuthenticated = true;
-      logger.info('Hepsiburada Basic Auth authentication successful');
+      logger.info("Hepsiburada Basic Auth authentication successful");
       return true;
     } catch (error) {
       this.isAuthenticated = false;
-      logger.error('Hepsiburada Basic Auth authentication failed:', error.response?.status, error.response?.statusText);
-      logger.error('Hepsiburada Auth Error Details:', {
+      logger.error(
+        "Hepsiburada Basic Auth authentication failed:",
+        error.response?.status,
+        error.response?.statusText
+      );
+      logger.error("Hepsiburada Auth Error Details:", {
         url: error.config?.url,
         method: error.config?.method,
-        headers: error.config?.headers ? 'present' : 'missing',
-        data: error.response?.data
+        headers: error.config?.headers ? "present" : "missing",
+        data: error.response?.data,
       });
       throw error;
     }
@@ -115,66 +135,73 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
 
   async getProducts(params = {}) {
     try {
-      const { 
-        offset = 0, 
-        limit = 50, 
-        sku,
-        listingId 
-      } = params;
-      
+      const { offset = 0, limit = 50, sku, listingId } = params;
       let url = `/product/api/products/all-products-of-merchant/${this.merchantId}`;
       const queryParams = { offset, limit };
-      
+
       if (sku) queryParams.sku = sku;
       if (listingId) queryParams.listingId = listingId;
-      
-      const response = await this.axiosInstance.get(url, { params: queryParams });
-      console.log(response.data);
+
+      const response = await this.axiosInstance.get(url, {
+        params: queryParams,
+      });
+      console.log(response.data.data);
+
       return {
-        products: response.data || [],
+        products: response.data.data || [],
         totalCount: response.data.totalElements,
         offset: response.data.offset,
-        limit: response.data.limit
+        limit: response.data.limit,
       };
     } catch (error) {
-      this.handleApiError(error, 'GET_PRODUCTS');
+      this.handleApiError(error, "GET_PRODUCTS");
+    }
+  }
+
+  async syncProductsWithDatabase(params = {}) {
+    try {
+      const { offset = 0, limit = 50, sku, listingId } = params;
+    } catch (error) {
+      this.handleApiError(error, "SYNC_PRODUCTS_WITH_DATABASE");
     }
   }
 
   async createProduct(productData) {
     try {
-      const hepsiburadaProduct = this.transformProductForHepsiburada(productData);
-      
+      const hepsiburadaProduct =
+        this.transformProductForHepsiburada(productData);
+
       const response = await this.axiosInstance.post(
         `/api/product/v1/products/merchant/${this.merchantId}`,
         hepsiburadaProduct
       );
-      
+
       return {
         success: true,
         data: response.data,
-        listingId: response.data.listingId
+        listingId: response.data.listingId,
       };
     } catch (error) {
-      this.handleApiError(error, 'CREATE_PRODUCT');
+      this.handleApiError(error, "CREATE_PRODUCT");
     }
   }
 
   async updateProduct(productId, productData) {
     try {
-      const hepsiburadaProduct = this.transformProductForHepsiburada(productData);
-      
+      const hepsiburadaProduct =
+        this.transformProductForHepsiburada(productData);
+
       const response = await this.axiosInstance.put(
         `/api/product/v1/products/merchant/${this.merchantId}/${productId}`,
         hepsiburadaProduct
       );
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
-      this.handleApiError(error, 'UPDATE_PRODUCT');
+      this.handleApiError(error, "UPDATE_PRODUCT");
     }
   }
 
@@ -183,10 +210,10 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       await this.axiosInstance.delete(
         `/api/product/v1/products/merchant/${this.merchantId}/${productId}`
       );
-      
+
       return { success: true };
     } catch (error) {
-      this.handleApiError(error, 'DELETE_PRODUCT');
+      this.handleApiError(error, "DELETE_PRODUCT");
     }
   }
 
@@ -194,20 +221,20 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     try {
       const stockData = {
         merchantSku: productId,
-        availableStock: stock
+        availableStock: stock,
       };
-      
+
       const response = await this.axiosInstance.put(
         `/api/product/v1/products/merchant/${this.merchantId}/${productId}/price-inventory`,
         stockData
       );
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
-      this.handleApiError(error, 'UPDATE_STOCK');
+      this.handleApiError(error, "UPDATE_STOCK");
     }
   }
 
@@ -215,51 +242,45 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
     try {
       const priceData = {
         merchantSku: productId,
-        price: price
+        price: price,
       };
-      
+
       const response = await this.axiosInstance.put(
         `/api/product/v1/products/merchant/${this.merchantId}/${productId}/price-inventory`,
         priceData
       );
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
-      this.handleApiError(error, 'UPDATE_PRICE');
+      this.handleApiError(error, "UPDATE_PRICE");
     }
   }
 
   async getOrders(params = {}) {
     try {
-      const {
-        offset = 0,
-        limit = 50,
-        status,
-        beginDate,
-        endDate
-      } = params;
-      
+      const { offset = 0, limit = 50, status, beginDate, endDate } = params;
+
       const queryParams = { offset, limit };
       if (status) queryParams.status = status;
       if (beginDate) queryParams.beginDate = beginDate;
       if (endDate) queryParams.endDate = endDate;
-      
+
       const response = await this.axiosInstance.get(
         `/api/order/v1/orders/merchant/${this.merchantId}`,
         { params: queryParams }
       );
-      
+
       return {
         orders: response.data.orderList || [],
         totalCount: response.data.totalCount,
         offset: response.data.offset,
-        limit: response.data.limit
+        limit: response.data.limit,
       };
     } catch (error) {
-      this.handleApiError(error, 'GET_ORDERS');
+      this.handleApiError(error, "GET_ORDERS");
     }
   }
 
@@ -268,30 +289,84 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       const statusData = {
         status,
         cargoCompany: trackingInfo.carrierCode,
-        trackingNumber: trackingInfo.trackingNumber
+        trackingNumber: trackingInfo.trackingNumber,
       };
-      
+
       const response = await this.axiosInstance.put(
         `/api/order/v1/orders/merchant/${this.merchantId}/${orderId}/status`,
         statusData
       );
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
-      this.handleApiError(error, 'UPDATE_ORDER_STATUS');
+      this.handleApiError(error, "UPDATE_ORDER_STATUS");
     }
   }
 
-  async getCategories() {
+  async getCategories({getAllCategories = true}) {
     try {
-      const response = await this.axiosInstance.get('/api/category/v1/categories');
-      
-      return response.data.categoryList || [];
+      let categories = [];
+
+      if (getAllCategories) {
+        let currentPage = 0;
+        let totalPages = 0;
+        
+        do {
+          let queryParams = {
+            leaf: true,
+            status: "ACTIVE",
+            available: true,
+            page: currentPage,
+          };
+
+          const response = await this.axiosInstance.get(
+            "/product/api/categories/get-all-categories",
+            { params: queryParams }
+          );
+
+          // İlk istekte totalPages'i al
+          if (currentPage === 0) {
+            totalPages = response.data.totalPages || 1;
+          }
+
+          // Bu sayfadaki kategorileri ana diziye ekle
+          if (response.data.data && Array.isArray(response.data.data)) {
+            categories = categories.concat(response.data.data);
+          }
+
+          currentPage++;
+          
+          // Rate limiting için kısa bir bekleme
+          if (currentPage < totalPages) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+          
+        } while (currentPage < totalPages);
+        
+        logger.info(`Hepsiburada: Retrieved ${categories.length} categories from ${totalPages} pages`);
+      } else {
+        // Sadece ilk sayfayı getir
+        let queryParams = {
+          leaf: true,
+          status: "ACTIVE",
+          available: true,
+          page: 0,
+        };
+
+        const response = await this.axiosInstance.get(
+          "/product/api/categories/get-all-categories",
+          { params: queryParams }
+        );
+
+        categories = response.data.data || [];
+      }
+
+      return categories;
     } catch (error) {
-      this.handleApiError(error, 'GET_CATEGORIES');
+      this.handleApiError(error, "GET_CATEGORIES");
     }
   }
 
@@ -305,19 +380,19 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       categoryId: this.getCategoryId(product.category),
       price: product.basePrice,
       availableStock: product.totalStock,
-      images: product.images?.map(img => img.url) || [],
+      images: product.images?.map((img) => img.url) || [],
       attributes: this.transformAttributes(product.specifications || []),
-      variants: []
+      variants: [],
     };
 
     // Transform variants
     if (product.variants && product.variants.length > 0) {
-      hepsiburadaProduct.variants = product.variants.map(variant => ({
+      hepsiburadaProduct.variants = product.variants.map((variant) => ({
         merchantSku: variant.sku,
         price: variant.price,
         availableStock: variant.stock,
         images: variant.images || [],
-        attributes: this.transformVariantAttributes(variant.attributes || [])
+        attributes: this.transformVariantAttributes(variant.attributes || []),
       }));
     }
 
@@ -325,16 +400,16 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
   }
 
   transformAttributes(specifications) {
-    return specifications.map(spec => ({
+    return specifications.map((spec) => ({
       attributeId: this.getAttributeId(spec.name),
-      attributeValue: spec.value
+      attributeValue: spec.value,
     }));
   }
 
   transformVariantAttributes(attributes) {
-    return attributes.map(attr => ({
+    return attributes.map((attr) => ({
       attributeId: this.getAttributeId(attr.name),
-      attributeValue: attr.value
+      attributeValue: attr.value,
     }));
   }
 
@@ -352,36 +427,36 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
   // Override order status mapping for Hepsiburada
   mapOrderStatus(hepsiburadaStatus) {
     const statusMap = {
-      'WaitingForApproval': 'pending',
-      'Approved': 'confirmed',
-      'Preparing': 'processing',
-      'Shipped': 'shipped',
-      'Delivered': 'delivered',
-      'Cancelled': 'cancelled',
-      'Returned': 'returned',
-      'UnDelivered': 'returned'
+      WaitingForApproval: "pending",
+      Approved: "confirmed",
+      Preparing: "processing",
+      Shipped: "shipped",
+      Delivered: "delivered",
+      Cancelled: "cancelled",
+      Returned: "returned",
+      UnDelivered: "returned",
     };
-    
-    return statusMap[hepsiburadaStatus] || 'pending';
+
+    return statusMap[hepsiburadaStatus] || "pending";
   }
 
   // Batch operations
   async batchUpdatePricesAndStock(items) {
     try {
-      const promises = items.map(item => 
+      const promises = items.map((item) =>
         this.updatePriceAndStock(item.sku, item.price, item.stock)
       );
-      
+
       const results = await Promise.allSettled(promises);
-      
+
       return {
         total: items.length,
-        success: results.filter(r => r.status === 'fulfilled').length,
-        failed: results.filter(r => r.status === 'rejected').length,
-        results: results
+        success: results.filter((r) => r.status === "fulfilled").length,
+        failed: results.filter((r) => r.status === "rejected").length,
+        results: results,
       };
     } catch (error) {
-      this.handleApiError(error, 'BATCH_UPDATE_PRICES_STOCK');
+      this.handleApiError(error, "BATCH_UPDATE_PRICES_STOCK");
     }
   }
 
@@ -390,20 +465,20 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       const data = {
         merchantSku: sku,
         price: price,
-        availableStock: stock
+        availableStock: stock,
       };
-      
+
       const response = await this.axiosInstance.put(
         `/api/product/v1/products/merchant/${this.merchantId}/${sku}/price-inventory`,
         data
       );
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error) {
-      this.handleApiError(error, 'UPDATE_PRICE_AND_STOCK');
+      this.handleApiError(error, "UPDATE_PRICE_AND_STOCK");
     }
   }
 
@@ -413,12 +488,12 @@ class HepsiburadaAdapter extends MarketplaceAdapter {
       const response = await this.axiosInstance.get(
         `/api/order/v1/orders/merchant/${this.merchantId}/${orderId}/delivery`
       );
-      
+
       return response.data;
     } catch (error) {
-      this.handleApiError(error, 'GET_DELIVERY_STATUS');
+      this.handleApiError(error, "GET_DELIVERY_STATUS");
     }
   }
 }
 
-module.exports = HepsiburadaAdapter; 
+module.exports = HepsiburadaAdapter;

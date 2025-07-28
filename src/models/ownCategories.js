@@ -1,13 +1,13 @@
 const { DataTypes, Model } = require("sequelize");
 const { getSequelize } = require("../config/database");
 
-class ProductCategory extends Model {}
+class OwnCategories extends Model {}
 
-// Initialize ProductCategory model
-const initProductCategory = () => {
+// Initialize OwnCategories model
+const initOwnCategories = () => {
   const sequelize = getSequelize();
 
-  ProductCategory.init(
+  OwnCategories.init(
     {
       id: {
         type: DataTypes.BIGINT,
@@ -37,11 +37,19 @@ const initProductCategory = () => {
       marketplace: {
         type: DataTypes.STRING(100),
       },
+      categoryId: {
+        type: DataTypes.BIGINT,
+        allowNull: false,
+      },
+      parentId: {
+        type: DataTypes.BIGINT,
+        allowNull: true,
+      },
     },
     {
       sequelize,
-      modelName: "ProductCategory",
-      tableName: "product_categories",
+      modelName: "OwnCategories",
+      tableName: "ownCategories",
       indexes: [
         {
           fields: ["name"],
@@ -55,31 +63,31 @@ const initProductCategory = () => {
       ],
     }
   );
-  return ProductCategory;
+  return OwnCategories;
 };
 
 // Define associations
-const associateProductCategory = () => {
+const associateOwnCategories = () => {
   // Self-referential association for parent-child categories
-  ProductCategory.belongsTo(ProductCategory, {
+  /*   OwnCategories.belongsTo(OwnCategories, {
     foreignKey: "parent_id",
     as: "parent",
   });
 
-  ProductCategory.hasMany(ProductCategory, {
+  OwnCategories.hasMany(OwnCategories, {
     foreignKey: "parent_id",
     as: "children",
   });
-
-  // ProductCategory has many products (disabled until category_id column is added to products table)
-  // ProductCategory.hasMany(Product, {
+ */
+  // OwnCategories has many products (disabled until category_id column is added to products table)
+  // OwnCategories.hasMany(Product, {
   //   foreignKey: 'category_id',
   //   as: 'products'
   // });
 };
 
 module.exports = {
-  ProductCategory,
-  initProductCategory,
-  associateProductCategory,
+  OwnCategories,
+  initOwnCategories,
+  associateOwnCategories,
 };
